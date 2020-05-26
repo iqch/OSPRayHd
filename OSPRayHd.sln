@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.26430.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OSPRayHd", "OSPRayHd\OSPRayHd.vcxproj", "{0DA72A5F-473E-4053-B79F-59C436DBE537}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+		ReleaseOpt|x64 = ReleaseOpt|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{0DA72A5F-473E-4053-B79F-59C436DBE537}.Debug|x64.ActiveCfg = Debug|x64
+		{0DA72A5F-473E-4053-B79F-59C436DBE537}.Debug|x64.Build.0 = Debug|x64
+		{0DA72A5F-473E-4053-B79F-59C436DBE537}.Release|x64.ActiveCfg = Release|x64
+		{0DA72A5F-473E-4053-B79F-59C436DBE537}.Release|x64.Build.0 = Release|x64
+		{0DA72A5F-473E-4053-B79F-59C436DBE537}.ReleaseOpt|x64.ActiveCfg = ReleaseOpt|x64
+		{0DA72A5F-473E-4053-B79F-59C436DBE537}.ReleaseOpt|x64.Build.0 = ReleaseOpt|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
