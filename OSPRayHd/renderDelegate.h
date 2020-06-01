@@ -32,8 +32,8 @@
 #include <pxr/imaging/hd/renderDelegate.h>
 #include <pxr/imaging/hd/renderIndex.h>
 #include <pxr/pxr.h>
-
-using namespace pxr;
+//
+//using namespace pxr;
 
 // OPSRAY
 #include "ospray/ospray.h"
@@ -43,19 +43,19 @@ using namespace pxr;
 #include "api.h"
 
 
-//PXR_NAMESPACE_OPEN_SCOPE
+PXR_NAMESPACE_OPEN_SCOPE
 
-#define HDOSPRAY_RENDER_SETTINGS_TOKENS                                        \
-    (ambientOcclusionSamples)(samplesPerFrame)(useDenoiser)(maxDepth)(         \
-           aoDistance)(samplesToConvergence)(ambientLight)(eyeLight)(          \
-           keyLight)(fillLight)(backLight)(pathTracer)(staticDirectionalLights)
+// (ambientOcclusionSamples)(samplesPerFrame)(useDenoiser)(maxDepth)(aoDistance)
+
+#define HDOSPRAY_RENDER_SETTINGS_TOKENS  (samplesToConvergence)(useDenoiser)          \
+          // (ambientLight)(keyLight)(fillLight)(backLight)(staticDirectionalLights)(eyeLight)
 
 TF_DECLARE_PUBLIC_TOKENS(HdOSPRayRenderSettingsTokens,
                          HDOSPRAY_RENDER_SETTINGS_TOKENS);
 
-#define HDOSPRAY_TOKENS (ospray)(glslfx)
+//#define HDOSPRAY_TOKENS (ospray)(glslfx)
 
-TF_DECLARE_PUBLIC_TOKENS(HdOSPRayTokens, HDOSPRAY_API, HDOSPRAY_TOKENS);
+//TF_DECLARE_PUBLIC_TOKENS(HdOSPRayTokens, HDOSPRAY_API, HDOSPRAY_TOKENS);
 
 class HdOSPRayRenderParam;
 
@@ -87,7 +87,9 @@ public:
     /// scene.
     virtual ~HdOSPRayRenderDelegate();
 
-    /// Return this delegate's render param.
+	void _InitParams();
+
+	/// Return this delegate's render param.
     ///   \return A shared instance of HdOSPRayRenderParam.
     virtual HdRenderParam* GetRenderParam() const override;
 
@@ -196,8 +198,8 @@ public:
     ///   \param tracker The change tracker passed to prim Sync().
     virtual void CommitResources(HdChangeTracker* tracker) override;
 
-    HDOSPRAY_API
-    virtual TfToken GetMaterialNetworkSelector() const;
+    //HDOSPRAY_API
+    //virtual TfToken GetMaterialNetworkSelector() const;
 
     /// This function tells the scene which material variant to reference.
     ///   \return A token specifying which material variant this renderer
@@ -215,6 +217,8 @@ public:
     ///           output buffer should be.
     virtual HdAovDescriptor
     GetDefaultAovDescriptor(TfToken const& name) const override;
+
+	//virtual VtDictionary GetRenderStats() const override;
 
     /// Returns a list of user-configurable render settings.
     /// This is a reflection API for the render settings dictionary; it need
@@ -242,10 +246,9 @@ private:
 
     // Handle for the top-level OSPRay model
     //OSPModel _model;
-	OSPWorld _world;
+	//OSPWorld _world;
 
-    OSPRenderer
-           _renderer; // moved from Pass to Delegate due to Material dependancy
+    //OSPRenderer _renderer; // moved from Pass to Delegate due to Material dependancy
 
     // A list of render setting exports.
     HdRenderSettingDescriptorList _settingDescriptors;
@@ -258,8 +261,11 @@ private:
     // A shared HdOSPRayRenderParam object that stores top-level OSPRay state;
     // passed to prims during Sync().
     std::shared_ptr<HdOSPRayRenderParam> _renderParam;
+
+	static void HandleOSPRayStatusMsg(const char *messageText);
+	static void HandleOSPRayError(OSPError, const char *errorDetails);
 };
 
-//PXR_NAMESPACE_CLOSE_SCOPE
+PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif // HDOSPRAY_RENDER_DELEGATE_H

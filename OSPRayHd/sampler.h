@@ -48,9 +48,9 @@
 #include <pxr/base/gf/vec4f.h>
 #include <pxr/base/gf/vec4i.h>
 
-using namespace pxr;
+//using namespace pxr;
 
-//PXR_NAMESPACE_OPEN_SCOPE
+PXR_NAMESPACE_OPEN_SCOPE
 
 /// \class HdOSPRayTypeHelper
 ///
@@ -140,6 +140,6 @@ public:
 private:
     HdVtBufferSource const& _buffer;
 };
-//PXR_NAMESPACE_CLOSE_SCOPE
+PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif // HDOSPRAY_SAMPLER_H

@@ -3,7 +3,13 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.26430.14
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OSPRayHd", "OSPRayHd\OSPRayHd.vcxproj", "{0DA72A5F-473E-4053-B79F-59C436DBE537}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "_hdOSPRay", "OSPRayHd\OSPRayHd.vcxproj", "{0DA72A5F-473E-4053-B79F-59C436DBE537}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "testcase", "testcase\testcase.vcxproj", "{72268B3A-11DA-4B1A-8B81-FC7D7A3996B4}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hdEzra", "hdOSPRay\hdOSPRay.vcxproj", "{212FDAAB-D8A8-461F-A2A9-2509B4A551D0}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ospraytest1", "ospraytest1\ospraytest1.vcxproj", "{D13E4790-D1CF-4649-A333-30656025C40B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -18,6 +24,24 @@ Global
 		{0DA72A5F-473E-4053-B79F-59C436DBE537}.Release|x64.Build.0 = Release|x64
 		{0DA72A5F-473E-4053-B79F-59C436DBE537}.ReleaseOpt|x64.ActiveCfg = ReleaseOpt|x64
 		{0DA72A5F-473E-4053-B79F-59C436DBE537}.ReleaseOpt|x64.Build.0 = ReleaseOpt|x64
+		{72268B3A-11DA-4B1A-8B81-FC7D7A3996B4}.Debug|x64.ActiveCfg = Debug|x64
+		{72268B3A-11DA-4B1A-8B81-FC7D7A3996B4}.Debug|x64.Build.0 = Debug|x64
+		{72268B3A-11DA-4B1A-8B81-FC7D7A3996B4}.Release|x64.ActiveCfg = Release|x64
+		{72268B3A-11DA-4B1A-8B81-FC7D7A3996B4}.Release|x64.Build.0 = Release|x64
+		{72268B3A-11DA-4B1A-8B81-FC7D7A3996B4}.ReleaseOpt|x64.ActiveCfg = Release|x64
+		{72268B3A-11DA-4B1A-8B81-FC7D7A3996B4}.ReleaseOpt|x64.Build.0 = Release|x64
+		{212FDAAB-D8A8-461F-A2A9-2509B4A551D0}.Debug|x64.ActiveCfg = Debug|x64
+		{212FDAAB-D8A8-461F-A2A9-2509B4A551D0}.Debug|x64.Build.0 = Debug|x64
+		{212FDAAB-D8A8-461F-A2A9-2509B4A551D0}.Release|x64.ActiveCfg = Release|x64
+		{212FDAAB-D8A8-461F-A2A9-2509B4A551D0}.Release|x64.Build.0 = Release|x64
+		{212FDAAB-D8A8-461F-A2A9-2509B4A551D0}.ReleaseOpt|x64.ActiveCfg = Release|x64
+		{212FDAAB-D8A8-461F-A2A9-2509B4A551D0}.ReleaseOpt|x64.Build.0 = Release|x64
+		{D13E4790-D1CF-4649-A333-30656025C40B}.Debug|x64.ActiveCfg = Debug|x64
+		{D13E4790-D1CF-4649-A333-30656025C40B}.Debug|x64.Build.0 = Debug|x64
+		{D13E4790-D1CF-4649-A333-30656025C40B}.Release|x64.ActiveCfg = Release|x64
+		{D13E4790-D1CF-4649-A333-30656025C40B}.Release|x64.Build.0 = Release|x64
+		{D13E4790-D1CF-4649-A333-30656025C40B}.ReleaseOpt|x64.ActiveCfg = Release|x64
+		{D13E4790-D1CF-4649-A333-30656025C40B}.ReleaseOpt|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

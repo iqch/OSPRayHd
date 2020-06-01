@@ -22,21 +22,18 @@
 // language governing permissions and limitations under the Apache License.
 //
 
+// CRT
+#include <iostream>
+using namespace std;
+
 // PXR 
-
-#include <pxr/imaging/glf/glew.h>
-
 #include <pxr/imaging/hd/resourceRegistry.h>
 
-
-// XXX: Add other Rprim types later
 #include <pxr/imaging/hd/camera.h>
-// XXX: Add other Sprim types later
 #include <pxr/imaging/hd/bprim.h>
-// XXX: Add bprim types
-#include <pxr/imaging/hdSt/material.h>
 
-using namespace pxr;
+// OSPRAY
+#include <ospray/ospray.h>
 
 // OSPRAYHD
 
@@ -50,33 +47,183 @@ using namespace pxr;
 
 #include "renderDelegate.h"
 
+// DEVICE
+OSPDevice device = NULL;
 
-#include <iostream>
+PXR_NAMESPACE_OPEN_SCOPE
 
-//PXR_NAMESPACE_OPEN_SCOPE
+// STATICS
+std::mutex HdOSPRayRenderDelegate::_mutexResourceRegistry;
+std::atomic_int HdOSPRayRenderDelegate::_counterResourceRegistry;
+HdResourceRegistrySharedPtr HdOSPRayRenderDelegate::_resourceRegistry;
 
-TF_DEFINE_PUBLIC_TOKENS(HdOSPRayRenderSettingsTokens,
-                        HDOSPRAY_RENDER_SETTINGS_TOKENS);
+// RENDER SETTINGS/PARAMS
 
-TF_DEFINE_PUBLIC_TOKENS(HdOSPRayTokens, HDOSPRAY_TOKENS);
+TF_DEFINE_PUBLIC_TOKENS(HdOSPRayRenderSettingsTokens, HDOSPRAY_RENDER_SETTINGS_TOKENS);
 
+//TF_DEFINE_PUBLIC_TOKENS(HdOSPRayTokens, HDOSPRAY_TOKENS);
+
+void HdOSPRayRenderDelegate::_InitParams()
+{
+	// Initialize the settings and settings descriptors.
+	_settingDescriptors.push_back(
+	{ "samplesToConvergence",
+		HdOSPRayRenderSettingsTokens->samplesToConvergence,
+		VtValue(int(HdOSPRayConfig::GetInstance().samplesToConvergence)) });
+	_settingDescriptors.push_back(
+	{ "useDenoiser",
+		HdOSPRayRenderSettingsTokens->useDenoiser,
+		VtValue(bool(HdOSPRayConfig::GetInstance().useDenoiser)) });
+
+	_PopulateDefaultSettings(_settingDescriptors);
+};
+
+HdRenderParam* HdOSPRayRenderDelegate::GetRenderParam() const
+{
+	return _renderParam.get();
+};
+
+HdRenderSettingDescriptorList
+HdOSPRayRenderDelegate::GetRenderSettingDescriptors() const
+{
+	return _settingDescriptors;
+};
+
+// SUPPORTED TYPES
+
+// RPRIM
 const TfTokenVector HdOSPRayRenderDelegate::SUPPORTED_RPRIM_TYPES = {
     HdPrimTypeTokens->mesh,
 };
 
+TfTokenVector const&
+HdOSPRayRenderDelegate::GetSupportedRprimTypes() const
+{
+	return SUPPORTED_RPRIM_TYPES;
+}
+
+HdRprim* HdOSPRayRenderDelegate::CreateRprim(TfToken const& typeId,
+	SdfPath const& rprimId,
+	SdfPath const& instancerId)
+{
+	if (typeId == HdPrimTypeTokens->mesh)
+	{
+		return new HdOSPRayMesh(rprimId, instancerId);
+	}
+	else
+	{
+		TF_CODING_ERROR("Unknown Rprim Type %s", typeId.GetText());
+	};
+
+	return nullptr;
+}
+
+void HdOSPRayRenderDelegate::DestroyRprim(HdRprim* rPrim)
+{
+	delete rPrim;
+}
+
+// INSTANCER
+HdInstancer*
+HdOSPRayRenderDelegate::CreateInstancer(HdSceneDelegate* delegate,
+	SdfPath const& id,
+	SdfPath const& instancerId)
+{
+	return NULL;
+	//return new HdOSPRayInstancer(delegate, id, instancerId);
+}
+
+void
+HdOSPRayRenderDelegate::DestroyInstancer(HdInstancer* instancer)
+{
+	delete instancer;
+}
+
+// SPRIM
 const TfTokenVector HdOSPRayRenderDelegate::SUPPORTED_SPRIM_TYPES = {
     HdPrimTypeTokens->camera,
     HdPrimTypeTokens->material,
 };
 
-const TfTokenVector HdOSPRayRenderDelegate::SUPPORTED_BPRIM_TYPES = {};
+TfTokenVector const&
+HdOSPRayRenderDelegate::GetSupportedSprimTypes() const
+{
+	return SUPPORTED_SPRIM_TYPES;
+}
 
-std::mutex HdOSPRayRenderDelegate::_mutexResourceRegistry;
-std::atomic_int HdOSPRayRenderDelegate::_counterResourceRegistry;
-HdResourceRegistrySharedPtr HdOSPRayRenderDelegate::_resourceRegistry;
+HdSprim*
+HdOSPRayRenderDelegate::CreateSprim(TfToken const& typeId,
+	SdfPath const& sprimId)
+{
+	if (typeId == HdPrimTypeTokens->camera)
+	{
+		return new HdCamera(sprimId);
+	}
+	else if (typeId == HdPrimTypeTokens->material)
+	{
+		return new HdOSPRayMaterial(sprimId);
+	}
+	else
+	{
+	TF_CODING_ERROR("Unknown Sprim Type %s", typeId.GetText());
+	};
 
-HdOSPRayRenderDelegate::HdOSPRayRenderDelegate()
-    : HdRenderDelegate()
+	return nullptr;
+}
+
+HdSprim*
+HdOSPRayRenderDelegate::CreateFallbackSprim(TfToken const& typeId)
+{
+	// For fallback sprims, create objects with an empty scene path.
+	// They'll use default values and won't be updated by a scene delegate.
+	return CreateSprim(typeId, SdfPath::EmptyPath());
+}
+
+void
+HdOSPRayRenderDelegate::DestroySprim(HdSprim* sPrim)
+{
+	delete sPrim;
+}
+
+// BPRIM
+const TfTokenVector HdOSPRayRenderDelegate::SUPPORTED_BPRIM_TYPES = {
+	HdPrimTypeTokens->renderBuffer
+	//HdPrimTypeTokens->openvdb, ? volume
+};
+
+TfTokenVector const&
+HdOSPRayRenderDelegate::GetSupportedBprimTypes() const
+{
+	return SUPPORTED_BPRIM_TYPES;
+}
+
+HdBprim*
+HdOSPRayRenderDelegate::CreateBprim(TfToken const& typeId,
+	SdfPath const& bprimId)
+{
+	if (typeId == HdPrimTypeTokens->renderBuffer) {
+		return new HdOSPRayRenderBuffer(bprimId);
+	}
+	else {
+		TF_CODING_ERROR("Unknown Bprim Type %s", typeId.GetText());
+	}
+	return nullptr;
+}
+
+HdBprim*
+HdOSPRayRenderDelegate::CreateFallbackBprim(TfToken const& typeId)
+{
+	return CreateBprim(typeId, SdfPath::EmptyPath());
+}
+
+void
+HdOSPRayRenderDelegate::DestroyBprim(HdBprim* bPrim)
+{
+	delete bPrim;
+}
+
+// CTOR/DTOR/INIT
+HdOSPRayRenderDelegate::HdOSPRayRenderDelegate() : HdRenderDelegate()
 {
     _Initialize();
 }
@@ -96,109 +243,72 @@ HdOSPRayRenderDelegate::_Initialize()
 //#    error This version of HdOSPRay is configured to built against USD v0.19.x
 //#endif
 
-    int ac = 1;
-    std::string initArgs = HdOSPRayConfig::GetInstance().initArgs;
-    std::stringstream ss(initArgs);
-    std::string arg;
-    std::vector<std::string> args;
-    while (ss >> arg) {
-        args.push_back(arg);
-    }
-    ac = static_cast<int>(args.size() + 1);
-    const char** av = new const char*[ac];
-    av[0] = "ospray";
-    for (int i = 1; i < ac; i++) {
-        av[i] = args[i - 1].c_str();
-    }
-    int init_error = ospInit(&ac, av);
-    if (init_error != OSP_NO_ERROR) {
-        std::cerr << "FATAL ERROR DURING INITIALIZATION!" << std::endl;
-    } else {
-        auto device = ospGetCurrentDevice();
-        if (device == nullptr) {
-            std::cerr << "FATAL ERROR DURING GETTING CURRENT DEVICE!"
-                      << std::endl;
-        }
+	if (device == NULL)
+	{
+		int ac = 1;
+		std::string initArgs = HdOSPRayConfig::GetInstance().initArgs;
+		std::stringstream ss(initArgs);
+		std::string arg;
+		std::vector<std::string> args;
+		while (ss >> arg)
+		{
+			args.push_back(arg);
+		};
 
-        ospDeviceSetStatusFunc(device,
-                               [](const char* msg) { std::cout << msg; });
-        ospDeviceSetErrorFunc(device, [](OSPError e, const char* msg) {
-            std::cerr << "OSPRAY ERROR [" << e << "]: " << msg << std::endl;
-        });
+		ac = static_cast<int>(args.size() + 1);
+		const char** av = new const char*[ac];
+		av[0] = "ospray";
+		for (int i = 1; i < ac; i++)
+		{
+			av[i] = args[i - 1].c_str();
+		};
+		int init_error = ospInit(&ac, av);
+		if (init_error != OSP_NO_ERROR)
+		{
+			std::cerr << "FATAL ERROR DURING INITIALIZATION!" << std::endl;
+			return;
+		}
 
-        ospDeviceCommit(device);
-    }
-    if (ospGetCurrentDevice() == nullptr) {
-        // user most likely specified bad arguments, retry without them
-        ac = 1;
-        ospInit(&ac, av);
-    }
-    delete[] av;
+		device = ospGetCurrentDevice();
+		if (device == nullptr) 
+		{
+			std::cerr << "FATAL ERROR DURING GETTING CURRENT DEVICE!" << std::endl;
+			return;
+		};
 
-#ifdef HDOSPRAY_PLUGIN_PTEX
-    ospLoadModule("ptex");
-#endif
+		//ospDeviceSetStatusFunc(device, [](const char* msg) { std::cout << msg; });
+		ospDeviceSetStatusFunc(device, HdOSPRayRenderDelegate::HandleOSPRayStatusMsg);
+		ospDeviceSetErrorFunc(device, HdOSPRayRenderDelegate::HandleOSPRayError);
+		//	[](OSPError e, const char* msg) { std::cerr << "OSPRAY ERROR [" << e << "]: " << msg << std::endl; });
 
-    if (HdOSPRayConfig::GetInstance().usePathTracing == 1)
-        _renderer = ospNewRenderer("pt");
-    else
-        _renderer = ospNewRenderer("sv");
+		ospDeviceCommit(device);
 
-    // Store top-level OSPRay objects inside a render param that can be
-    // passed to prims during Sync().
-    _renderParam
-           = std::make_shared<HdOSPRayRenderParam>(_renderer, &_sceneVersion);
+		//if (ospGetCurrentDevice() == nullptr)
+		//{
+		//	// user most likely specified bad arguments, retry without them
+		//	ac = 1;
+		//	ospInit(&ac, av);
+		//};
+
+		delete[] av;
+	}
+
+   // ospLoadModule("ptex"); // DO IT LATER
+
+
+	ospLoadModule("denoiser");
+
+    _renderParam = std::make_shared<HdOSPRayRenderParam>(&_sceneVersion);
 
     // Initialize one resource registry for all OSPRay plugins
     std::lock_guard<std::mutex> guard(_mutexResourceRegistry);
 
-    if (_counterResourceRegistry.fetch_add(1) == 0) {
+    if (_counterResourceRegistry.fetch_add(1) == 0)
+	{
         _resourceRegistry.reset(new HdResourceRegistry());
-    }
+	};
 
-    // Initialize the settings and settings descriptors.
-    // _settingDescriptors.resize(11);
-    _settingDescriptors.push_back(
-           { "Ambient occlusion samples",
-             HdOSPRayRenderSettingsTokens->ambientOcclusionSamples,
-             VtValue(int(
-                    HdOSPRayConfig::GetInstance().ambientOcclusionSamples)) });
-    _settingDescriptors.push_back(
-           { "Samples per frame", HdOSPRayRenderSettingsTokens->samplesPerFrame,
-             VtValue(int(HdOSPRayConfig::GetInstance().samplesPerFrame)) });
-    _settingDescriptors.push_back(
-           { "Toggle denoiser", HdOSPRayRenderSettingsTokens->useDenoiser,
-             VtValue(bool(HdOSPRayConfig::GetInstance().useDenoiser)) });
-    _settingDescriptors.push_back(
-           { "maxDepth", HdOSPRayRenderSettingsTokens->maxDepth,
-             VtValue(int(HdOSPRayConfig::GetInstance().maxDepth)) });
-    _settingDescriptors.push_back(
-           { "aoDistance", HdOSPRayRenderSettingsTokens->aoDistance,
-             VtValue(float(HdOSPRayConfig::GetInstance().aoDistance)) });
-    _settingDescriptors.push_back(
-           { "samplesToConvergence",
-             HdOSPRayRenderSettingsTokens->samplesToConvergence,
-             VtValue(
-                    int(HdOSPRayConfig::GetInstance().samplesToConvergence)) });
-    _settingDescriptors.push_back(
-           { "ambientLight", HdOSPRayRenderSettingsTokens->ambientLight,
-             VtValue(bool(HdOSPRayConfig::GetInstance().ambientLight)) });
-    _settingDescriptors.push_back(
-           { "staticDirectionalLights", HdOSPRayRenderSettingsTokens->staticDirectionalLights,
-             VtValue(bool(HdOSPRayConfig::GetInstance().staticDirectionalLights)) });
-    _settingDescriptors.push_back(
-           { "eyeLight", HdOSPRayRenderSettingsTokens->eyeLight,
-             VtValue(bool(HdOSPRayConfig::GetInstance().eyeLight)) });
-    _settingDescriptors.push_back(
-           { "keyLight", HdOSPRayRenderSettingsTokens->keyLight,
-             VtValue(bool(HdOSPRayConfig::GetInstance().keyLight)) });
-    _settingDescriptors.push_back(
-           { "fillLight", HdOSPRayRenderSettingsTokens->fillLight,
-             VtValue(bool(HdOSPRayConfig::GetInstance().fillLight)) });
-    _settingDescriptors.push_back(
-           { "backLight", HdOSPRayRenderSettingsTokens->backLight,
-             VtValue(bool(HdOSPRayConfig::GetInstance().backLight)) });
-    _PopulateDefaultSettings(_settingDescriptors);
+	_InitParams();
 }
 
 HdOSPRayRenderDelegate::~HdOSPRayRenderDelegate()
@@ -206,17 +316,36 @@ HdOSPRayRenderDelegate::~HdOSPRayRenderDelegate()
     // Clean the resource registry only when it is the last OSPRay delegate
     std::lock_guard<std::mutex> guard(_mutexResourceRegistry);
 
-    if (_counterResourceRegistry.fetch_sub(1) == 1) {
+    if (_counterResourceRegistry.fetch_sub(1) == 1)
+	{
         _resourceRegistry.reset();
     }
 
     _renderParam.reset();
-}
+};
 
-HdRenderParam*
-HdOSPRayRenderDelegate::GetRenderParam() const
+// CALLBACKS
+
+void HdOSPRayRenderDelegate::HandleOSPRayStatusMsg(const char *messageText)
 {
-    return _renderParam.get();
+	cout << "HDOSPRAY STMSG : " << messageText << endl;
+};
+
+void HdOSPRayRenderDelegate::HandleOSPRayError(OSPError e, const char *errorDetails)
+{
+	cout << "HDOSPRAY ERROR : " << e << " :: " << errorDetails << endl;
+
+	TF_CODING_ERROR("HDOSPRAY ERROR : %s", errorDetails);
+};
+
+
+
+// RESOURCES PROCESSING
+
+HdResourceRegistrySharedPtr
+HdOSPRayRenderDelegate::GetResourceRegistry() const
+{
+	return _resourceRegistry;
 }
 
 void
@@ -224,166 +353,81 @@ HdOSPRayRenderDelegate::CommitResources(HdChangeTracker* tracker)
 {
     // CommitResources() is called after prim sync has finished, but before any
     // tasks (such as draw tasks) have run.
-    auto& rp = _renderParam;
-    const auto modelVersion = rp->GetModelVersion();
-    if (modelVersion > _lastCommittedModelVersion) {
-        _lastCommittedModelVersion = modelVersion;
+	//std::shared_ptr<HdOSPRayRenderParam>& rp = _renderParam;
+    const int modelVersion = _renderParam->GetModelVersion();
+    if (modelVersion > _lastCommittedModelVersion) 
+	{
+        _lastCommittedModelVersion = modelVersion; // POSSIBLE CHANGE TO WORLD VERSION
     }
 }
 
-TfToken
-HdOSPRayRenderDelegate::GetMaterialNetworkSelector() const
-{
-    // Carson: this should be "HdOSPRayTokens->ospray", but we return glslfx so
-    // that we work with many supplied shaders
-    // TODO: is it possible to return both?
-    return HdOSPRayTokens->glslfx;
-}
+// RECENT
 
-TfTokenVector const&
-HdOSPRayRenderDelegate::GetSupportedRprimTypes() const
-{
-    return SUPPORTED_RPRIM_TYPES;
-}
+//TfToken
+//HdOSPRayRenderDelegate::GetMaterialNetworkSelector() const
+//{
+//	// Carson: this should be "HdOSPRayTokens->ospray", but we return glslfx so
+//	// that we work with many supplied shaders
+//	// TODO: is it possible to return both?
+//	return HdOSPRayTokens->glslfx;
+//	//return HdOSPRayTokens->glslfx;
+//}
 
-TfTokenVector const&
-HdOSPRayRenderDelegate::GetSupportedSprimTypes() const
-{
-    return SUPPORTED_SPRIM_TYPES;
-}
-
-TfTokenVector const&
-HdOSPRayRenderDelegate::GetSupportedBprimTypes() const
-{
-    return SUPPORTED_BPRIM_TYPES;
-}
-
-HdResourceRegistrySharedPtr
-HdOSPRayRenderDelegate::GetResourceRegistry() const
-{
-    return _resourceRegistry;
-}
 
 HdAovDescriptor
 HdOSPRayRenderDelegate::GetDefaultAovDescriptor(TfToken const& name) const
 {
-    if (name == HdAovTokens->color) {
-        return HdAovDescriptor(HdFormatUNorm8Vec4, true,
-                               VtValue(GfVec4f(0.0f)));
-    } else if (name == HdAovTokens->normal || name == HdAovTokens->Neye) {
-        return HdAovDescriptor(HdFormatFloat32Vec3, false,
-                               VtValue(GfVec3f(-1.0f)));
-    } else if (name == HdAovTokens->depth) {
-        return HdAovDescriptor(HdFormatFloat32, false, VtValue(1.0f));
+    if (name == HdAovTokens->color) 
+	{
+		//return HdAovDescriptor(HdFormatUNorm8Vec4, true, VtValue(GfVec4f(0.0f)));
+		return HdAovDescriptor(HdFormatFloat32Vec4, true, VtValue(GfVec4f(0.0f)));
+    } 
+	//else if (name == HdAovTokens->normal || name == HdAovTokens->Neye) 
+	//{
+ //       return HdAovDescriptor(HdFormatFloat32Vec3, false, VtValue(GfVec3f(-1.0f)));
+ //   } 
+	//if (name == HdAovTokens->depth)
+	//{
+	//	return HdAovDescriptor(HdFormatFloat32, false, VtValue(1.0f));
+	//}
     //} else if (name == HdAovTokens->linearDepth) {
     //    return HdAovDescriptor(HdFormatFloat32, false, VtValue(0.0f));
-    } else if (name == HdAovTokens->primId) {
-        return HdAovDescriptor(HdFormatInt32, false, VtValue(0));
-    } else {
+   // } 
+	else if (name == HdAovTokens->primId ||
+		name == HdAovTokens->instanceId ||
+		name == HdAovTokens->elementId)
+	{
+        return HdAovDescriptor(HdFormatInt32, false, VtValue(-1));
+    } 
+	else 
+	{
         HdParsedAovToken aovId(name);
-        if (aovId.isPrimvar) {
-            return HdAovDescriptor(HdFormatFloat32Vec3, false,
-                                   VtValue(GfVec3f(0.0f)));
-        }
-    }
+        if (aovId.isPrimvar) 
+		{
+            return HdAovDescriptor(HdFormatFloat32Vec3, false, VtValue(GfVec3f(0.0f)));
+		};
+	};
 
     return HdAovDescriptor();
-}
+};
 
 HdRenderPassSharedPtr
 HdOSPRayRenderDelegate::CreateRenderPass(HdRenderIndex* index,
                                          HdRprimCollection const& collection)
 {
-    return HdRenderPassSharedPtr(new HdOSPRayRenderPass(
-           index, collection, _renderer, &_sceneVersion, _renderParam));
-}
+    return HdRenderPassSharedPtr(
+		new HdOSPRayRenderPass(index, collection, &_sceneVersion, _renderParam));
+};
 
-HdInstancer*
-HdOSPRayRenderDelegate::CreateInstancer(HdSceneDelegate* delegate,
-                                        SdfPath const& id,
-                                        SdfPath const& instancerId)
-{
-    return new HdOSPRayInstancer(delegate, id, instancerId);
-}
 
-void
-HdOSPRayRenderDelegate::DestroyInstancer(HdInstancer* instancer)
-{
-    delete instancer;
-}
+//VtDictionary
+//HdEmbreeRenderDelegate::GetRenderStats() const
+//{
+//	VtDictionary stats;
+//	stats[HdPerfTokens->numCompletedSamples.GetString()] =
+//		_renderer.GetCompletedSamples();
+//	return stats;
+//}
 
-HdRprim*
-HdOSPRayRenderDelegate::CreateRprim(TfToken const& typeId,
-                                    SdfPath const& rprimId,
-                                    SdfPath const& instancerId)
-{
-    if (typeId == HdPrimTypeTokens->mesh) {
-        return new HdOSPRayMesh(rprimId, instancerId);
-    } else {
-        TF_CODING_ERROR("Unknown Rprim Type %s", typeId.GetText());
-    }
 
-    return nullptr;
-}
-
-void
-HdOSPRayRenderDelegate::DestroyRprim(HdRprim* rPrim)
-{
-    delete rPrim;
-}
-
-HdSprim*
-HdOSPRayRenderDelegate::CreateSprim(TfToken const& typeId,
-                                    SdfPath const& sprimId)
-{
-    if (typeId == HdPrimTypeTokens->camera) {
-        return new HdCamera(sprimId);
-    } else if (typeId == HdPrimTypeTokens->material) {
-        return new HdOSPRayMaterial(sprimId);
-    } else {
-        TF_CODING_ERROR("Unknown Sprim Type %s", typeId.GetText());
-    }
-
-    return nullptr;
-}
-
-HdSprim*
-HdOSPRayRenderDelegate::CreateFallbackSprim(TfToken const& typeId)
-{
-    // For fallback sprims, create objects with an empty scene path.
-    // They'll use default values and won't be updated by a scene delegate.
-    return CreateSprim(typeId, SdfPath::EmptyPath());
-}
-
-void
-HdOSPRayRenderDelegate::DestroySprim(HdSprim* sPrim)
-{
-    delete sPrim;
-}
-
-HdBprim*
-HdOSPRayRenderDelegate::CreateBprim(TfToken const& typeId,
-                                    SdfPath const& bprimId)
-{
-    return nullptr;
-}
-
-HdBprim*
-HdOSPRayRenderDelegate::CreateFallbackBprim(TfToken const& typeId)
-{
-    return CreateBprim(typeId, SdfPath::EmptyPath());
-}
-
-void
-HdOSPRayRenderDelegate::DestroyBprim(HdBprim* bPrim)
-{
-    delete bPrim;
-}
-
-HdRenderSettingDescriptorList
-HdOSPRayRenderDelegate::GetRenderSettingDescriptors() const
-{
-    return _settingDescriptors;
-}
-
-//PXR_NAMESPACE_CLOSE_SCOPE
+PXR_NAMESPACE_CLOSE_SCOPE

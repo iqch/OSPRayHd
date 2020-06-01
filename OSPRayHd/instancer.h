@@ -36,9 +36,9 @@
 #include <pxr/base/tf/hashmap.h>
 #include <pxr/base/tf/token.h>
 
-using namespace pxr;
+//using namespace pxr;
 
-//PXR_NAMESPACE_OPEN_SCOPE
+PXR_NAMESPACE_OPEN_SCOPE
 
 /// \class HdOSPRayInstancer
 ///
@@ -94,6 +94,6 @@ private:
     TfHashMap<TfToken, HdVtBufferSource*, TfToken::HashFunctor> _primvarMap;
 };
 
-//PXR_NAMESPACE_CLOSE_SCOPE
+PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif // HDOSPRAY_INSTANCER_H

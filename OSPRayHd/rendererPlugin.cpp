@@ -31,25 +31,31 @@
 #include "rendererPlugin.h"
 
 
-//PXR_NAMESPACE_OPEN_SCOPE
+PXR_NAMESPACE_OPEN_SCOPE
 
 // Register the OSPRay plugin with the renderer plugin system.
 TF_REGISTRY_FUNCTION(TfType)
 {
     HdRendererPluginRegistry::Define<HdOSPRayRendererPlugin>();
+};
+
+HdOSPRayRendererPlugin::HdOSPRayRendererPlugin()
+{
+	int i = 0;
+
 }
 
 HdRenderDelegate*
 HdOSPRayRendererPlugin::CreateRenderDelegate()
 {
     return new HdOSPRayRenderDelegate();
-}
+};
 
 void
 HdOSPRayRendererPlugin::DeleteRenderDelegate(HdRenderDelegate* renderDelegate)
 {
     delete renderDelegate;
-}
+};
 
 bool
 HdOSPRayRendererPlugin::IsSupported() const
@@ -57,6 +63,6 @@ HdOSPRayRendererPlugin::IsSupported() const
     // Nothing more to check for now, we assume if the plugin loads correctly
     // it is supported.
     return true;
-}
+};
 
-//PXR_NAMESPACE_CLOSE_SCOPE
+PXR_NAMESPACE_CLOSE_SCOPE

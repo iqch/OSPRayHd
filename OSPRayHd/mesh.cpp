@@ -39,7 +39,7 @@
 #include "pxr/imaging/hdSt/material.h"
 #include "pxr/imaging/hdSt/drawItem.h"
 
-using namespace pxr;
+//using namespace pxr;
 
 // OSPRAY
 
@@ -60,7 +60,7 @@ using namespace pxr;
 
 
 
-//PXR_NAMESPACE_OPEN_SCOPE
+PXR_NAMESPACE_OPEN_SCOPE
 
 // clang-format off
 TF_DEFINE_PRIVATE_TOKENS(
@@ -70,12 +70,14 @@ TF_DEFINE_PRIVATE_TOKENS(
 // clang-format on
 
 // USD forces warnings when converting ospcommon::affine3f to osp::affine3f
-const ospcommon::math::affine3f Identity({ 1, 0, 0, 0, 1, 0, 0, 0, 1 });
+//const ospcommon::math::affine3f Identity({ 1, 0, 0, 0, 1, 0, 0, 0, 1 });
 
 HdOSPRayMesh::HdOSPRayMesh(SdfPath const& id, SdfPath const& instancerId)
     : HdMesh(id, instancerId)
-    , _ospMesh(nullptr)
-    , _instanceModel(nullptr)
+	, _mesh(nullptr)
+	, _model(nullptr)
+	, _group(nullptr)
+    , _instance(nullptr)
     , _adjacencyValid(false)
     , _normalsValid(false)
     , _refined(false)
@@ -83,16 +85,19 @@ HdOSPRayMesh::HdOSPRayMesh(SdfPath const& id, SdfPath const& instancerId)
     , _doubleSided(false)
     , _cullStyle(HdCullStyleDontCare)
 {
-}
+};
 
 void
 HdOSPRayMesh::Finalize(HdRenderParam* renderParam)
 {
-    if (_instanceModel && _ospMesh) {
-        ospRemoveGeometry(_instanceModel, _ospMesh);
-        ospRelease(_instanceModel);
-    }
-}
+    if (_instance) ospRelease(_instance);
+	if (_group) ospRelease(_group);
+	if (_model) ospRelease(_model);
+	if (_mesh) ospRelease(_mesh);
+
+    // WHAT IS IT? ospRemoveGeometry(_instanceModel, _ospMesh);
+
+};
 
 HdDirtyBits
 HdOSPRayMesh::GetInitialDirtyBitsMask() const
@@ -112,13 +117,13 @@ HdOSPRayMesh::GetInitialDirtyBitsMask() const
            ;
 
     return (HdDirtyBits)mask;
-}
+};
 
 HdDirtyBits
 HdOSPRayMesh::_PropagateDirtyBits(HdDirtyBits bits) const
 {
     return bits;
-}
+};
 
 void
 HdOSPRayMesh::_InitRepr(TfToken const& reprToken, HdDirtyBits* dirtyBits)
@@ -126,17 +131,18 @@ HdOSPRayMesh::_InitRepr(TfToken const& reprToken, HdDirtyBits* dirtyBits)
     TF_UNUSED(dirtyBits);
 
     // Create an empty repr.
-    _ReprVector::iterator it = std::find_if(_reprs.begin(), _reprs.end(),
-                                            _ReprComparator(reprToken));
-    if (it == _reprs.end()) {
-        _reprs.emplace_back(reprToken, HdReprSharedPtr());
-    }
-}
+    _ReprVector::iterator it = std::find_if(
+		_reprs.begin(), _reprs.end(), _ReprComparator(reprToken));
 
-static bool
-_IsEnabledForceQuadrangulate()
+	if (it == _reprs.end()) 
+	{
+        _reprs.emplace_back(reprToken, HdReprSharedPtr());
+	};
+};
+
+static bool _IsEnabledForceQuadrangulate()
 {
-    static bool enabled = HdOSPRayConfig::GetInstance().forceQuadrangulate == 1;
+	static bool enabled = false; // HdOSPRayConfig::GetInstance().forceQuadrangulate == 1;
     return enabled;
 }
 
@@ -146,19 +152,22 @@ HdOSPRayMesh::_UseQuadIndices(const HdRenderIndex& renderIndex,
 {
     // We should never quadrangulate for subdivision schemes
     // which refine to triangles (like Loop)
-    if (topology.GetScheme() == PxOsdOpenSubdivTokens->loop)
-        return false;
+	if (topology.GetScheme() == PxOsdOpenSubdivTokens->loop)
+	{
+		return false; 	
+	}
 
     // According to HdSt _ospMesh.cpp, always use quads on surfaces with ptex
     const HdOSPRayMaterial* material = static_cast<const HdOSPRayMaterial*>(
            renderIndex.GetSprim(HdPrimTypeTokens->material, GetMaterialId()));
-    if (material && material->HasPtex())
+
+	if (material && material->HasPtex())
         return true;
 
     // Fallback to the environment variable, which allows forcing of
     // quadrangulation for debugging/testing.
     return _IsEnabledForceQuadrangulate();
-}
+};
 
 void
 HdOSPRayMesh::Sync(HdSceneDelegate* sceneDelegate, HdRenderParam* renderParam,
@@ -178,19 +187,21 @@ HdOSPRayMesh::Sync(HdSceneDelegate* sceneDelegate, HdRenderParam* renderParam,
     // Pull top-level OSPRay state out of the render param.
     HdOSPRayRenderParam* ospRenderParam
            = static_cast<HdOSPRayRenderParam*>(renderParam);
-    OSPRenderer renderer = ospRenderParam->GetOSPRayRenderer();
+    //OSPRenderer renderer = ospRenderParam->GetOSPRayRenderer();
 
-    if (*dirtyBits & HdChangeTracker::DirtyMaterialId) {
+    if (*dirtyBits & HdChangeTracker::DirtyMaterialId)
+	{
         _SetMaterialId(sceneDelegate->GetRenderIndex().GetChangeTracker(),
                        sceneDelegate->GetMaterialId(GetId()));
-    }
+	};
 
     // Create ospray geometry objects.
-    _PopulateOSPMesh(sceneDelegate, renderer, dirtyBits, desc, ospRenderParam);
+    _PopulateOSPMesh(sceneDelegate, /*renderer,*/ dirtyBits, desc, ospRenderParam);
 
-    if (*dirtyBits & HdChangeTracker::DirtyTopology) {
+    if (*dirtyBits & HdChangeTracker::DirtyTopology)
+	{
         // TODO: update material here?
-    }
+	};
 }
 
 void
@@ -211,73 +222,80 @@ HdOSPRayMesh::_UpdatePrimvarSources(HdSceneDelegate* sceneDelegate,
     // the set of primvars, so we only ever add and update to the primvar set.
 
     HdPrimvarDescriptorVector primvars;
-    for (size_t i = 0; i < HdInterpolationCount; ++i) {
+    for (size_t i = 0; i < HdInterpolationCount; ++i)
+	{
         HdInterpolation interp = static_cast<HdInterpolation>(i);
         primvars = GetPrimvarDescriptors(sceneDelegate, interp);
-        for (HdPrimvarDescriptor const& pv : primvars) {
+        for (HdPrimvarDescriptor const& pv : primvars) 
+		{
 
             // Points are handled outside _UpdatePrimvarSources
-            if (pv.name == HdTokens->points)
-                continue;
+            if (pv.name == HdTokens->points) continue;
 
             auto value = sceneDelegate->Get(id, pv.name);
 
             // texcoords
             if (pv.name == "Texture_uv"
-                && HdChangeTracker::IsPrimvarDirty(dirtyBits, id,
-                                                   HdOSPRayTokens->st)) {
-                if (value.IsHolding<VtVec2fArray>()) {
+                && HdChangeTracker::IsPrimvarDirty(dirtyBits, id, HdOSPRayTokens->st))
+			{
+                if (value.IsHolding<VtVec2fArray>()) 
+				{
                     _texcoords = value.Get<VtVec2fArray>();
-                }
-            }
+				};
+			};
 
             if (pv.name == "displayColor"
-                && HdChangeTracker::IsPrimvarDirty(dirtyBits, id,
-                                                   HdTokens->displayColor)) {
+                && HdChangeTracker::IsPrimvarDirty(dirtyBits, id, HdTokens->displayColor))
+			{
                 // Create 4 component displayColor/opacity array for OSPRay
                 // XXX OSPRay currently expects 4 component color array.
                 // XXX Extend OSPRay to support separate RGB/Opacity arrays
-                if (value.IsHolding<VtVec3fArray>()) {
+                if (value.IsHolding<VtVec3fArray>())
+				{
                     const VtVec3fArray& colors = value.Get<VtVec3fArray>();
                     _colors.resize(colors.size());
-                    for (size_t i = 0; i < colors.size(); i++) {
-                        _colors[i] = { colors[i].data()[0], colors[i].data()[1],
-                                       colors[i].data()[2], 1.f };
-                    }
-                    if (!_colors.empty()) {
+                    for (size_t i = 0; i < colors.size(); i++) 
+					{
+                        _colors[i] = { colors[i].data()[0], colors[i].data()[1], colors[i].data()[2], 1.f };
+					};
+
+                    if (!_colors.empty())
+					{
                         // for vertex coloring, make diffuse color white
-                        if (_colors.size() > 1) {
+                        if (_colors.size() > 1) 
+						{
                             _singleColor = { 1.f, 1.f, 1.f, 1.f };
-                        } else {
-                            _singleColor = { _colors[0][0], _colors[0][1],
-                                             _colors[0][2], 1.f };
-                        }
-                    }
-                }
-            }
+                        } 
+						else 
+						{
+                            _singleColor = { _colors[0][0], _colors[0][1], _colors[0][2], 1.f };
+						};
+					};
+				};
+			};
 
             if (pv.name == "displayOpacity"
-                && HdChangeTracker::IsPrimvarDirty(dirtyBits, id,
-                                                   HdTokens->displayOpacity)) {
+                && HdChangeTracker::IsPrimvarDirty(dirtyBits, id, HdTokens->displayOpacity))
+			{
                 // XXX assuming displayOpacity can't exist without
                 // displayColor and/or have a different size
-                if (value.IsHolding<VtFloatArray>()) {
+                if (value.IsHolding<VtFloatArray>())
+				{
                     const VtFloatArray& opacities = value.Get<VtFloatArray>();
-                    if (_colors.size() < opacities.size())
-                        _colors.resize(opacities.size());
+                    if (_colors.size() < opacities.size()) _colors.resize(opacities.size());
                     for (size_t i = 0; i < opacities.size(); i++)
                         _colors[i].data()[3] = opacities[i];
                     if (!_colors.empty())
                         _singleColor[3] = _colors[0][3];
-                }
-            }
-        }
-    }
-}
+				};
+			};
+		};
+	};
+};
 
 void
 HdOSPRayMesh::_PopulateOSPMesh(HdSceneDelegate* sceneDelegate,
-                               OSPRenderer renderer, HdDirtyBits* dirtyBits,
+                               /*OSPRenderer renderer,*/ HdDirtyBits* dirtyBits,
                                HdMeshReprDesc const& desc,
                                HdOSPRayRenderParam* renderParam)
 {
@@ -289,32 +307,39 @@ HdOSPRayMesh::_PopulateOSPMesh(HdSceneDelegate* sceneDelegate,
     ////////////////////////////////////////////////////////////////////////
     // 1. Pull scene data.
 
-    if (HdChangeTracker::IsPrimvarDirty(*dirtyBits, id, HdTokens->points)) {
+    if (HdChangeTracker::IsPrimvarDirty(*dirtyBits, id, HdTokens->points)) 
+	{
         VtValue value = sceneDelegate->Get(id, HdTokens->points);
         _points = value.Get<VtVec3fArray>();
         if (_points.size() > 0)
             _normalsValid = false;
-    }
+	};
 
-    if (HdChangeTracker::IsDisplayStyleDirty(*dirtyBits, id)) {
+    if (HdChangeTracker::IsDisplayStyleDirty(*dirtyBits, id))
+	{
         HdDisplayStyle const displayStyle = sceneDelegate->GetDisplayStyle(id);
         _topology = HdMeshTopology(_topology, displayStyle.refineLevel);
-    }
+	};
 
-    if (HdChangeTracker::IsTransformDirty(*dirtyBits, id)) {
+    if (HdChangeTracker::IsTransformDirty(*dirtyBits, id)) 
+	{
         _transform = GfMatrix4f(sceneDelegate->GetTransform(id));
-    }
+	};
 
-    if (HdChangeTracker::IsVisibilityDirty(*dirtyBits, id)) {
+    if (HdChangeTracker::IsVisibilityDirty(*dirtyBits, id))
+	{
         _UpdateVisibility(sceneDelegate, dirtyBits);
-    }
+	};
 
-    if (HdChangeTracker::IsCullStyleDirty(*dirtyBits, id)) {
+    if (HdChangeTracker::IsCullStyleDirty(*dirtyBits, id))
+	{
         _cullStyle = GetCullStyle(sceneDelegate);
-    }
-    if (HdChangeTracker::IsDoubleSidedDirty(*dirtyBits, id)) {
+	};
+    if (HdChangeTracker::IsDoubleSidedDirty(*dirtyBits, id))
+	{
         _doubleSided = IsDoubleSided(sceneDelegate);
-    }
+	};
+
     if (HdChangeTracker::IsPrimvarDirty(*dirtyBits, id, HdTokens->normals)
         || HdChangeTracker::IsPrimvarDirty(*dirtyBits, id, HdTokens->widths)
         || HdChangeTracker::IsPrimvarDirty(*dirtyBits, id, HdTokens->primvar)
@@ -323,9 +348,10 @@ HdOSPRayMesh::_PopulateOSPMesh(HdSceneDelegate* sceneDelegate,
         || HdChangeTracker::IsPrimvarDirty(*dirtyBits, id,
                                            HdTokens->displayOpacity)
         || HdChangeTracker::IsPrimvarDirty(*dirtyBits, id,
-                                           HdOSPRayTokens->st)) {
+                                           HdOSPRayTokens->st))
+	{
         _UpdatePrimvarSources(sceneDelegate, *dirtyBits);
-    }
+	};
 
     ////////////////////////////////////////////////////////////////////////
     // 2. Resolve drawstyles
@@ -350,21 +376,22 @@ HdOSPRayMesh::_PopulateOSPMesh(HdSceneDelegate* sceneDelegate,
 
     // If the subdivision scheme is "none" or "bilinear", force us not to use
     // smooth normals.
-    _smoothNormals = _smoothNormals
-           && ((_topology.GetScheme() != PxOsdOpenSubdivTokens->none));
+    _smoothNormals = _smoothNormals && ((_topology.GetScheme() != PxOsdOpenSubdivTokens->none));
 
-    if (HdChangeTracker::IsSubdivTagsDirty(*dirtyBits, id)
-        && _topology.GetRefineLevel() > 0) {
+    if (HdChangeTracker::IsSubdivTagsDirty(*dirtyBits, id) && _topology.GetRefineLevel() > 0)
+	{
         _topology.SetSubdivTags(sceneDelegate->GetSubdivTags(id));
-    }
+	};
 
     ////////////////////////////////////////////////////////////////////////
     // 3. Populate ospray prototype object.
 
     // If the refine level changed or the mesh was recreated, we need to pass
     // the refine level into the ospray subdiv object.
-    if (HdChangeTracker::IsDisplayStyleDirty(*dirtyBits, id)) {
-        if (doRefine) {
+    if (HdChangeTracker::IsDisplayStyleDirty(*dirtyBits, id))
+	{
+        if (doRefine)
+		{
             // Pass the target number of uniform refinements to Embree.
             // Embree refinement is specified as the number of quads to generate
             // per edge, whereas hydra refinement is the number of recursive
@@ -374,19 +401,20 @@ HdOSPRayMesh::_PopulateOSPMesh(HdSceneDelegate* sceneDelegate,
             // XXX: As of Embree 2.9.0, rendering with tessellation level 1
             // (i.e. coarse mesh) results in weird normals, so force at least
             // one level of subdivision.
-            if (_tessellationRate == 1) {
+            if (_tessellationRate == 1) 
+			{
                 _tessellationRate++;
-            }
-        }
-    }
+			};
+		};
+	};
 
     // If the topology has changed, or the value of doRefine has changed, we
     // need to create or recreate the OSPRay mesh object.
     // _GetInitialDirtyBits() ensures that the topology is dirty the first time
     // this function is called, so that the OSPRay mesh is always created.
     bool newMesh = false;
-    if (HdChangeTracker::IsTopologyDirty(*dirtyBits, id)
-        || doRefine != _refined) {
+    if (HdChangeTracker::IsTopologyDirty(*dirtyBits, id) || doRefine != _refined)
+	{
         newMesh = true;
 
         // Force the smooth normals code to rebuild the "normals" primvar the
@@ -402,9 +430,10 @@ HdOSPRayMesh::_PopulateOSPMesh(HdSceneDelegate* sceneDelegate,
         _topology.SetSubdivTags(subdivTags);
         _adjacencyValid = false;
 
-        if (doRefine) {
-            _ospMesh = _CreateOSPRaySubdivMesh();
-            ospCommit(_ospMesh);
+        if (doRefine) 
+		{
+            _mesh = _CreateOSPRaySubdivMesh();
+            ospCommit(_mesh);
 
             HdMeshUtil meshUtil(&_topology, GetId());
             meshUtil.ComputeQuadIndices(&_quadIndices, &_quadPrimitiveParams);
@@ -413,14 +442,14 @@ HdOSPRayMesh::_PopulateOSPMesh(HdSceneDelegate* sceneDelegate,
             // should be generalized to all primvars)
             bool faceVaryingTexcoord = false;
             HdPrimvarDescriptorVector faceVaryingPrimvars
-                   = GetPrimvarDescriptors(sceneDelegate,
-                                           HdInterpolationFaceVarying);
-            for (HdPrimvarDescriptor const& pv : faceVaryingPrimvars) {
-                if (pv.name == "Texture_uv")
-                    faceVaryingTexcoord = true;
-            }
+                   = GetPrimvarDescriptors(sceneDelegate, HdInterpolationFaceVarying);
+            for (HdPrimvarDescriptor const& pv : faceVaryingPrimvars)
+			{
+                if (pv.name == "Texture_uv") faceVaryingTexcoord = true;
+			};
 
-            if (faceVaryingTexcoord) {
+            if (faceVaryingTexcoord)
+			{
                 TfToken buffName = HdOSPRayTokens->st;
                 VtValue buffValue = VtValue(_texcoords);
                 HdVtBufferSource buffer(buffName, buffValue);
@@ -429,66 +458,79 @@ HdOSPRayMesh::_PopulateOSPMesh(HdSceneDelegate* sceneDelegate,
                 auto success = meshUtil.ComputeQuadrangulatedFaceVaryingPrimvar(
                        buffer.GetData(), buffer.GetNumElements(),
                        buffer.GetTupleType().type, &quadPrimvar);
-                if (success && quadPrimvar.IsHolding<VtVec2fArray>()) {
+                if (success && quadPrimvar.IsHolding<VtVec2fArray>())
+				{
                     _texcoords = quadPrimvar.Get<VtVec2fArray>();
-                } else {
+                } 
+				else
+				{
                     std::cout << "ERROR: could not quadrangulate face-varying "
                                  "data\n";
-                }
-            }
-        }
+				};
+			};
+		};
         _refined = doRefine;
-    }
+	};
 
     // Update the smooth normals in steps:
     // 1. If the topology is dirty, update the adjacency table, a processed
     //    form of the topology that helps calculate smooth normals quickly.
     // 2. If the points are dirty, update the smooth normal buffer itself.
     _normalsValid = false;
-    if (_smoothNormals && !_adjacencyValid) {
+    if (_smoothNormals && !_adjacencyValid)
+	{
         _adjacency.BuildAdjacencyTable(&_topology);
         _adjacencyValid = true;
         // If we rebuilt the adjacency table, force a rebuild of normals.
         _normalsValid = false;
-    }
-    if (_smoothNormals && !_normalsValid && !doRefine) {
-        _computedNormals = Hd_SmoothNormals::ComputeSmoothNormals(
-               &_adjacency, _points.size(), _points.cdata());
+	};
+    if (_smoothNormals && !_normalsValid && !doRefine)
+	{
+        _computedNormals = 
+			Hd_SmoothNormals::ComputeSmoothNormals(&_adjacency, _points.size(), _points.cdata());
         _normalsValid = true;
-    }
+	};
 
     // Create new OSP Mesh
-    if (_instanceModel)
-        ospRelease(_instanceModel);
-    _instanceModel = ospNewModel();
+	if (_instance) ospRelease(_instance);
+	if (_group) ospRelease(_group);
+	if (_model) ospRelease(_model);
+
+    //if (_instanceModel) ospRelease(_instanceModel);
+    //_instanceModel = ospNewModel(); // HERE NEW HIERARCHY
+
+	const HdRenderIndex& renderIndex = sceneDelegate->GetRenderIndex();
 
     if (newMesh
         || HdChangeTracker::IsPrimvarDirty(*dirtyBits, id, HdTokens->points)
         || HdChangeTracker::IsPrimvarDirty(*dirtyBits, id,
-                                           HdOSPRayTokens->st)) {
+                                           HdOSPRayTokens->st))
+	{
+	
+		if (_mesh) ospRelease(_mesh);
 
-        const HdRenderIndex& renderIndex = sceneDelegate->GetRenderIndex();
-        const HdOSPRayMaterial* material
-               = static_cast<const HdOSPRayMaterial*>(renderIndex.GetSprim(
-                      HdPrimTypeTokens->material, GetMaterialId()));
-
-        if (!_refined) {
+        if (!_refined)
+		{
             bool useQuads = _UseQuadIndices(renderIndex, _topology);
 
-            if (useQuads) {
-                _ospMesh = ospNewGeometry("quadmesh");
+            if (useQuads) 
+			{
+                _mesh = ospNewGeometry("mesh");
 
                 HdMeshUtil meshUtil(&_topology, GetId());
                 meshUtil.ComputeQuadIndices(&_quadIndices,
                                             &_quadPrimitiveParams);
 
-                auto indices = ospNewData(_quadIndices.size(), OSP_INT4,
-                                          _quadIndices.cdata(),
-                                          OSP_DATA_SHARED_BUFFER);
+                //auto indices = ospNewData(_quadIndices.size(), OSP_INT4,
+                //                          _quadIndices.cdata(),
+                //                          OSP_DATA_SHARED_BUFFER);
+
+				OSPData indices = ospNewSharedData(_quadIndices.cdata(), OSP_VEC4I, _quadIndices.size());
 
                 ospCommit(indices);
-                ospSetData(_ospMesh, "index", indices);
-                ospRelease(indices);
+				ospSetObjectAsData(_mesh, "index", OSP_VEC4I, indices);
+                //ospSetData(_ospMesh, "index", indices);
+                //ospRelease(indices);
 
                 // Check if texcoords are provides as face varying.
                 // XXX: (This code currently only cares about _texcoords, but
@@ -497,12 +539,14 @@ HdOSPRayMesh::_PopulateOSPMesh(HdSceneDelegate* sceneDelegate,
                 HdPrimvarDescriptorVector faceVaryingPrimvars
                        = GetPrimvarDescriptors(sceneDelegate,
                                                HdInterpolationFaceVarying);
-                for (HdPrimvarDescriptor const& pv : faceVaryingPrimvars) {
+                for (HdPrimvarDescriptor const& pv : faceVaryingPrimvars) 
+				{
                     if (pv.name == "Texture_uv")
                         faceVaryingTexcoord = true;
                 }
 
-                if (faceVaryingTexcoord) {
+                if (faceVaryingTexcoord) 
+				{
                     TfToken buffName = HdOSPRayTokens->st;
                     VtValue buffValue = VtValue(_texcoords);
                     HdVtBufferSource buffer(buffName, buffValue);
@@ -512,44 +556,57 @@ HdOSPRayMesh::_PopulateOSPMesh(HdSceneDelegate* sceneDelegate,
                            = meshUtil.ComputeQuadrangulatedFaceVaryingPrimvar(
                                   buffer.GetData(), buffer.GetNumElements(),
                                   buffer.GetTupleType().type, &quadPrimvar);
-                    if (success && quadPrimvar.IsHolding<VtVec2fArray>()) {
+                    if (success && quadPrimvar.IsHolding<VtVec2fArray>())
+					{
                         _texcoords = quadPrimvar.Get<VtVec2fArray>();
-                    } else {
+                    }
+					else
+					{
                         std::cout
                                << "ERROR: could not quadrangulate face-varying "
                                   "data\n";
-                    }
+					};
 
                     // usd stores texcoords in face indexed -> each quad has 4
                     // unique texcoords.
                     // let's try converting it to match our vertex indices
                     VtVec2fArray texcoords2;
                     texcoords2.resize(_points.size());
-                    for (size_t q = 0; q < _quadIndices.size(); q++) {
-                        for (int i = 0; i < 4; i++) {
+                    for (size_t q = 0; q < _quadIndices.size(); q++) 
+					{
+                        for (int i = 0; i < 4; i++) 
+						{
                             // value at quadindex[q][i] maps to q*4+i texcoord;
                             const size_t tc1index = q * 4 + i;
                             const size_t tc2index = _quadIndices[q][i];
                             texcoords2[tc2index] = _texcoords[tc1index];
-                        }
-                    }
+						};
+					};
                     _texcoords = texcoords2;
-                }
+				};
 
-            } else { // triangles
-                _ospMesh = ospNewGeometry("trianglemesh");
+            } 
+			else 
+			{
+				// triangles
+                _mesh = ospNewGeometry("mesh");
 
                 HdMeshUtil meshUtil(&_topology, GetId());
                 meshUtil.ComputeTriangleIndices(&_triangulatedIndices,
                                                 &_trianglePrimitiveParams);
 
-                auto indices = ospNewData(_triangulatedIndices.size(), OSP_INT3,
-                                          _triangulatedIndices.cdata(),
-                                          OSP_DATA_SHARED_BUFFER);
+                //auto indices = ospNewData(_triangulatedIndices.size(), OSP_INT3,
+                //                          _triangulatedIndices.cdata(),
+                //                          OSP_DATA_SHARED_BUFFER);
+
+				OSPData indices = ospNewSharedData(_triangulatedIndices.cdata(),
+					OSP_VEC3I, _triangulatedIndices.size());
 
                 ospCommit(indices);
-                ospSetData(_ospMesh, "index", indices);
-                ospRelease(indices);
+
+				ospSetObjectAsData(_mesh, "index", OSP_VEC3UI, indices);
+                //ospSetData(_ospMesh, "index", indices);
+                //ospRelease(indices);
 
                 // Check if texcoords are provides as face varying.
                 // XXX: (This code currently only cares about _texcoords, but
@@ -558,12 +615,13 @@ HdOSPRayMesh::_PopulateOSPMesh(HdSceneDelegate* sceneDelegate,
                 HdPrimvarDescriptorVector faceVaryingPrimvars
                        = GetPrimvarDescriptors(sceneDelegate,
                                                HdInterpolationFaceVarying);
-                for (HdPrimvarDescriptor const& pv : faceVaryingPrimvars) {
-                    if (pv.name == "Texture_uv")
-                        faceVaryingTexcoord = true;
+                for (HdPrimvarDescriptor const& pv : faceVaryingPrimvars)
+				{
+                    if (pv.name == "Texture_uv") faceVaryingTexcoord = true;
                 }
 
-                if (faceVaryingTexcoord) {
+                if (faceVaryingTexcoord)
+				{
                     TfToken buffName = HdOSPRayTokens->st;
                     VtValue buffValue = VtValue(_texcoords);
                     HdVtBufferSource buffer(buffName, buffValue);
@@ -574,81 +632,104 @@ HdOSPRayMesh::_PopulateOSPMesh(HdSceneDelegate* sceneDelegate,
                                   buffer.GetData(), buffer.GetNumElements(),
                                   buffer.GetTupleType().type,
                                   &triangulatedPrimvar);
-                    if (success
-                        && triangulatedPrimvar.IsHolding<VtVec2fArray>()) {
+                    if (success && triangulatedPrimvar.IsHolding<VtVec2fArray>())
+					{
                         _texcoords = triangulatedPrimvar.Get<VtVec2fArray>();
-                    } else {
+                    } 
+					else
+					{
                         std::cout
                                << "ERROR: could not triangulate face-varying "
                                   "data\n";
-                    }
+					};
 
                     // usd stores texcoords in face indexed -> each triangle has
                     // 3 unique texcoords. let's try converting it to match our
                     // vertex indices
                     VtVec2fArray texcoords2;
                     texcoords2.resize(_points.size());
-                    for (size_t t = 0; t < _triangulatedIndices.size(); t++) {
-                        for (int i = 0; i < 3; i++) {
+                    for (size_t t = 0; t < _triangulatedIndices.size(); t++)
+					{
+                        for (int i = 0; i < 3; i++) 
+						{
                             // value at triangleIndex[t][i] maps to t*3+i
                             // texcoord;
                             const size_t tc1index = t * 3 + i;
                             const size_t tc2index = _triangulatedIndices[t][i];
                             texcoords2[tc2index] = _texcoords[tc1index];
-                        }
-                    }
+						};
+					};
                     _texcoords = texcoords2;
-                }
-            }
-        }
+				};
+			};
+		};
 
-        auto vertices = ospNewData(_points.size(), OSP_FLOAT3, _points.cdata(),
-                                   OSP_DATA_SHARED_BUFFER);
+		OSPData vertices = ospNewSharedData(_points.cdata(), OSP_VEC3F, _points.size());
         ospCommit(vertices);
-        ospSetData(_ospMesh, "vertex", vertices);
-        ospRelease(vertices);
 
-        if (_computedNormals.size()) {
-            auto normals = ospNewData(_computedNormals.size(), OSP_FLOAT3,
-                                      _computedNormals.cdata(),
-                                      OSP_DATA_SHARED_BUFFER);
-            ospSetData(_ospMesh, "vertex.normal", normals);
-            ospRelease(normals);
-        }
+		ospSetObjectAsData(_mesh, "vertex.position", OSP_VEC3F, vertices);
+        //ospRelease(vertices);
 
-        if (_colors.size() > 1) {
-            auto colors = ospNewData(_colors.size(), OSP_FLOAT4,
-                                     _colors.cdata(), OSP_DATA_SHARED_BUFFER);
-            ospSetData(_ospMesh, "vertex.color", colors);
-            ospRelease(colors);
-        }
+        if (_computedNormals.size()) 
+		{
+			OSPData normals = ospNewSharedData(_computedNormals.cdata(), OSP_VEC3F,_computedNormals.size());
+            ospSetObjectAsData(_mesh, "vertex.normal", OSP_VEC3F, normals);
+            //ospRelease(normals);
+		};
 
-        if (_texcoords.size() > 1) {
-            auto texcoords
-                   = ospNewData(_texcoords.size(), OSP_FLOAT2,
-                                _texcoords.cdata(), OSP_DATA_SHARED_BUFFER);
+        if (_colors.size() > 1) 
+		{
+			OSPData colors = ospNewSharedData(_colors.cdata(), OSP_VEC4F, _colors.size());
+            ospSetObjectAsData(_mesh, "vertex.color", OSP_VEC4F, colors);
+            //ospRelease(colors);
+		};
+
+        if (_texcoords.size() > 1) 
+		{
+			OSPData texcoords = ospNewSharedData(_texcoords.cdata(), OSP_VEC2F,_texcoords.size());
             ospCommit(texcoords);
-            ospSetData(_ospMesh, "vertex.texcoord", texcoords);
-            ospRelease(texcoords);
-        }
+            ospSetObjectAsData(_mesh, "vertex.texcoord", OSP_VEC2F, texcoords);
+            //ospRelease(texcoords);
+		};
 
-        OSPMaterial ospMaterial = nullptr;
+		ospCommit(_mesh);
 
-        if (material && material->GetOSPRayMaterial()) {
-            ospMaterial = material->GetOSPRayMaterial();
-        } else {
-            // Create new ospMaterial
-            ospMaterial = HdOSPRayMaterial::CreateDefaultMaterial(_singleColor);
-        }
+        //ospAddGeometry(_instanceModel, _ospMesh);
+        //ospRelease(_ospMesh);
+        //ospCommit(_instanceModel);
 
-        ospSetMaterial(_ospMesh, ospMaterial);
-        ospCommit(_ospMesh);
-
-        ospAddGeometry(_instanceModel, _ospMesh);
-        ospRelease(_ospMesh);
-        ospCommit(_instanceModel);
         renderParam->UpdateModelVersion();
-    }
+	};
+
+	const HdOSPRayMaterial* material
+		= static_cast<const HdOSPRayMaterial*>(renderIndex.GetSprim(
+			HdPrimTypeTokens->material, GetMaterialId()));
+
+	OSPMaterial ospMaterial = nullptr;
+
+	if (material && material->GetOSPRayMaterial())
+	{
+		ospMaterial = material->GetOSPRayMaterial();
+	}
+	else
+	{
+		// Create new ospMaterial
+		ospMaterial = HdOSPRayMaterial::CreateDefaultMaterial(_singleColor);
+	};
+
+	//ospSetMaterial(_mesh, ospMaterial);
+	_model = ospNewGeometricModel(_mesh);
+	ospSetObject(_model, "material", ospMaterial);
+
+	ospCommit(_model);
+
+	_group = ospNewGroup();
+	OSPData models = ospNewSharedData1D(&_model, OSP_GEOMETRIC_MODEL, 1);
+	ospSetObject(_group, "geometry", models);
+	ospCommit(_group);
+
+	_instance = ospNewInstance(_group);
+	ospCommit(_instance);
 
     ////////////////////////////////////////////////////////////////////////
     // 4. Populate ospray instance objects.
@@ -657,7 +738,8 @@ HdOSPRayMesh::_PopulateOSPMesh(HdSceneDelegate* sceneDelegate,
     // XXX: The current instancer invalidation tracking makes it hard for
     // HdOSPRay to tell whether transforms will be dirty, so this code
     // pulls them every frame.
-    if (!GetInstancerId().IsEmpty()) {
+    if (!GetInstancerId().IsEmpty()) 
+	{
         // Retrieve instance transforms from the instancer.
         HdRenderIndex& renderIndex = sceneDelegate->GetRenderIndex();
         HdInstancer* instancer = renderIndex.GetInstancer(GetInstancerId());
@@ -670,7 +752,7 @@ HdOSPRayMesh::_PopulateOSPMesh(HdSceneDelegate* sceneDelegate,
         for (size_t i = 0; i < newSize; i++)
 		{
             // Create the new instance.
-            auto instance = ospNewInstance(_instanceModel, Identity);
+			auto instance = ospNewInstance(_group); // , Identity);
             // Combine the local transform and the instance transform.
             GfMatrix4f matf = _transform * GfMatrix4f(transforms[i]);
             float* xfm = matf.GetArray();
@@ -681,13 +763,12 @@ HdOSPRayMesh::_PopulateOSPMesh(HdSceneDelegate* sceneDelegate,
             ospSetVec3f(instance, "xfm.p", xfm[12], xfm[13], xfm[14]);
             ospCommit(instance);
             _ospInstances[i] = instance;
-        }
-    }
-    // Otherwise, create our single instance (if necessary) and update
-    // the transform (if necessary).
-    else {
+		};
+	}
+    else	// Otherwise, create our single instance (if necessary) and update
+	{		// the transform (if necessary).
         _ospInstances.resize(0);
-        OSPInstance instance = ospNewInstance(_instanceModel, identity);
+		OSPInstance instance = ospNewInstance(_group); // , identity);
         _ospInstances.push_back(instance);
         ospCommit(instance);
         // convert aligned matrix to unalighned 4x3 matrix
@@ -698,18 +779,21 @@ HdOSPRayMesh::_PopulateOSPMesh(HdSceneDelegate* sceneDelegate,
         ospSetVec3f(instance, "xfm.l.vz", xfm[8], xfm[9], xfm[10]);
         ospSetVec3f(instance, "xfm.p", xfm[12], xfm[13], xfm[14]);
         ospCommit(instance);
-    }
+	};
 
     // Update visibility by pulling the object into/out of the model.
-    if (_sharedData.visible) {
+    if (_sharedData.visible)
+	{
         renderParam->AddInstances(_ospInstances);
-    } else {
+    } 
+	else
+	{
         // TODO: ospRemove geometry?
-    }
+	};
 
     // Clean all dirty bits.
     *dirtyBits &= ~HdChangeTracker::AllSceneDirtyBits;
-}
+};
 
 void
 HdOSPRayMesh::_UpdateDrawItemGeometricShader(HdSceneDelegate* sceneDelegate,
@@ -729,15 +813,16 @@ HdOSPRayMesh::_UpdateDrawItemGeometricShader(HdSceneDelegate* sceneDelegate,
     // i.e.
     //   Repr CullStyle > Rprim CullStyle > RenderPass CullStyle
     //
-    if (cullStyle == HdCullStyleDontCare) {
+    if (cullStyle == HdCullStyleDontCare)
+	{
         cullStyle = _cullStyle;
-    }
+	};
 
     // The edge geomstyles below are rasterized as lines.
     // See HdSt_GeometricShader::BindResources()
     // The batches need to be validated and rebuilt if necessary.
     renderIndex.GetChangeTracker().MarkBatchesDirty();
-}
+};
 
 OSPGeometry
 HdOSPRayMesh::_CreateOSPRaySubdivMesh()
@@ -748,7 +833,8 @@ HdOSPRayMesh::_CreateOSPRaySubdivMesh()
     // unrolling the edge crease buffer below.
     VtIntArray const creaseLengths = subdivTags.GetCreaseLengths();
     int numEdgeCreases = 0;
-    for (size_t i = 0; i < creaseLengths.size(); ++i) {
+    for (size_t i = 0; i < creaseLengths.size(); ++i)
+	{
         numEdgeCreases += creaseLengths[i] - 1;
     }
 
@@ -757,51 +843,57 @@ HdOSPRayMesh::_CreateOSPRaySubdivMesh()
     int numVertexCreases
            = static_cast<int>(subdivTags.GetCornerIndices().size());
     if (numVertexCreases
-        != static_cast<int>(subdivTags.GetCornerWeights().size())) {
+        != static_cast<int>(subdivTags.GetCornerWeights().size()))
+	{
         TF_WARN("Mismatch between vertex crease indices and weights");
         numVertexCreases = 0;
     }
 
-    auto mesh = ospNewGeometry("subdivision");
+	OSPGeometry mesh = ospNewGeometry("subdivision");
     int numFaceVertices = _topology.GetFaceVertexCounts().size();
     int numIndices = _topology.GetFaceVertexIndices().size();
     int numVertices = _points.size();
 
-    auto vertices = ospNewData(numVertices, OSP_FLOAT3, _points.cdata());
-    ospSetData(mesh, "vertex", vertices);
-    ospRelease(vertices);
-    auto faces = ospNewData(numFaceVertices, OSP_UINT,
-                            _topology.GetFaceVertexCounts().cdata());
-    ospSetData(mesh, "face", faces);
-    ospRelease(faces);
-    auto indices = ospNewData(numIndices, OSP_UINT,
-                              _topology.GetFaceVertexIndices().cdata());
-    ospSetData(mesh, "index", indices);
-    ospRelease(indices);
-    // TODO: set hole buffer
+	OSPData vertices = ospNewSharedData(_points.cdata(),OSP_VEC3F, numVertices);
+    ospSetObjectAsData(mesh, "vertex.position", OSP_VEC3F, vertices);
+    //ospRelease(vertices);
+
+	OSPData faces = ospNewSharedData(_topology.GetFaceVertexCounts().cdata(), OSP_UINT, numFaceVertices);
+    ospSetObjectAsData(mesh, "face", OSP_UINT, faces);
+    //ospRelease(faces);
+
+	OSPData indices = ospNewSharedData(_topology.GetFaceVertexIndices().cdata(), OSP_UINT, numIndices);
+    ospSetObjectAsData(mesh, "index", OSP_UINT, indices);
+    //ospRelease(indices);
+
+    // TODO: set hole buffer - AGREE
 
     OSPData colorsData = nullptr;
     // there is a bug in ospray subd requiring a color array of size points.
     // if the color array is less than points size we create an array
     // of white colors as a workaround.
-    if (_colors.size() < _points.size()) {
-        GfVec4f white = { 1.f, 1.f, 1.f, 1.f };
+    if (_colors.size() < _points.size())
+	{
+        GfVec4f white = { 1.f, 0.85f, 0.15f, 1.f };
         std::vector<GfVec4f> colorDummy(_points.size(), white);
-        colorsData
-               = ospNewData(colorDummy.size(), OSP_FLOAT4, colorDummy.data());
-    } else {
-        colorsData = ospNewData(_colors.size(), OSP_FLOAT4, _colors.data());
+        colorsData = ospNewSharedData(colorDummy.data(), OSP_VEC4F,colorDummy.size());
     }
-    ospSetData(mesh, "color", colorsData);
-    ospRelease(colorsData);
+	else
+	{
+        colorsData = ospNewSharedData(_colors.data(), OSP_VEC4F, _colors.size());
+	};
+
+    ospSetObjectAsData(mesh, "color", OSP_VEC4F, colorsData);
+    //ospRelease(colorsData);
 
     // TODO: ospray subd appears to require color data... this will be fixed in
     // next release
 
-    ospSet1f(mesh, "level", _tessellationRate);
+    ospSetFloat(mesh, "level", _tessellationRate);
 
     // If this topology has edge creases, unroll the edge crease buffer.
-    if (numEdgeCreases > 0) {
+    if (numEdgeCreases > 0)
+	{
         std::vector<unsigned int> ospCreaseIndices(numEdgeCreases * 2);
         std::vector<float> ospCreaseWeights(numEdgeCreases);
         int ospEdgeIndex = 0;
@@ -814,9 +906,11 @@ HdOSPRayMesh::_CreateOSPRaySubdivMesh()
         // Loop through the creases; for each crease, loop through
         // the edges.
         int creaseIndexStart = 0;
-        for (size_t i = 0; i < creaseLengths.size(); ++i) {
+        for (size_t i = 0; i < creaseLengths.size(); ++i)
+		{
             int numEdges = creaseLengths[i] - 1;
-            for (int j = 0; j < numEdges; ++j) {
+            for (int j = 0; j < numEdges; ++j)
+			{
                 // Store the crease indices.
                 ospCreaseIndices[2 * ospEdgeIndex + 0]
                        = creaseIndices[creaseIndexStart + j];
@@ -829,34 +923,34 @@ HdOSPRayMesh::_CreateOSPRaySubdivMesh()
                        : creaseWeights[ospEdgeIndex];
 
                 ospEdgeIndex++;
-            }
+			};
             creaseIndexStart += creaseLengths[i];
-        }
+		};
 
-        auto edge_crease_indices
-               = ospNewData(numEdgeCreases, OSP_UINT2, ospCreaseIndices.data());
-        ospSetData(mesh, "edgeCrease.index", edge_crease_indices);
-        ospRelease(edge_crease_indices);
-        auto edge_crease_weights
-               = ospNewData(numEdgeCreases, OSP_FLOAT, ospCreaseWeights.data());
-        ospSetData(mesh, "edgeCrease.weight", edge_crease_weights);
-        ospRelease(edge_crease_weights);
+        OSPData edge_crease_indices
+               = ospNewSharedData(ospCreaseIndices.data(), OSP_VEC2UI,numEdgeCreases);
+        ospSetObjectAsData(mesh, "edgeCrease.index", OSP_VEC2UI, edge_crease_indices);
+        //ospRelease(edge_crease_indices);
+        OSPData edge_crease_weights
+               = ospNewSharedData(ospCreaseWeights.data(), OSP_FLOAT, numEdgeCreases);
+        ospSetObjectAsData(mesh, "edgeCrease.weight", OSP_FLOAT, edge_crease_weights);
+        //ospRelease(edge_crease_weights);
     }
 
-    if (numVertexCreases > 0) {
-        auto vertex_crease_indices
-               = ospNewData(numVertexCreases, OSP_UINT,
-                            subdivTags.GetCornerIndices().cdata());
-        ospSetData(mesh, "vertexCrease.index", vertex_crease_indices);
-        ospRelease(vertex_crease_indices);
-        auto vertex_crease_weights
-               = ospNewData(numVertexCreases, OSP_FLOAT,
-                            subdivTags.GetCornerWeights().cdata());
-        ospSetData(mesh, "vertexCrease.weight", vertex_crease_weights);
-        ospRelease(vertex_crease_weights);
-    }
+    if (numVertexCreases > 0)
+	{
+		OSPData vertex_crease_indices
+			= ospNewSharedData(subdivTags.GetCornerIndices().cdata(), OSP_UINT, numVertexCreases);
+
+        ospSetObjectAsData(mesh, "vertexCrease.index", OSP_UINT, vertex_crease_indices);
+        //ospRelease(vertex_crease_indices);
+		OSPData vertex_crease_weights
+               = ospNewSharedData(subdivTags.GetCornerWeights().cdata(), OSP_FLOAT,numVertexCreases);
+        ospSetObjectAsData(mesh, "vertexCrease.weight", OSP_FLOAT, vertex_crease_weights);
+        //ospRelease(vertex_crease_weights);
+	};
 
     return mesh;
 }
 
-//PXR_NAMESPACE_CLOSE_SCOPE
+PXR_NAMESPACE_CLOSE_SCOPE

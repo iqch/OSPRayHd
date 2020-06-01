@@ -26,7 +26,7 @@
 
 #include "pxr/base/arch/export.h"
 
-using namespace pxr;
+//using namespace pxr;
 
 #if defined(PXR_STATIC)
 #    define HDOSPRAY_API

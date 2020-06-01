@@ -31,7 +31,7 @@
 #include <pxr/pxr.h>
 #include <pxr/imaging/hd/material.h>
 
-using namespace pxr;
+//using namespace pxr;
 
 // OSPRAY
 #include "ospray/ospray.h"
@@ -39,7 +39,7 @@ using namespace pxr;
 // BOOST
 //#include <boost/shared_ptr.hpp>
 
-//PXR_NAMESPACE_OPEN_SCOPE
+PXR_NAMESPACE_OPEN_SCOPE
 
 //typedef boost::shared_ptr<class HdStTextureResource>
 //      HdStTextureResourceSharedPtr;
@@ -137,6 +137,6 @@ protected:
     OSPMaterial _ospMaterial { nullptr };
 };
 
-//PXR_NAMESPACE_CLOSE_SCOPE
+PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif // HDOSPRAY_MATERIAL_H

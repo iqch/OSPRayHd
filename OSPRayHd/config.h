@@ -36,14 +36,14 @@ using namespace std;
 #include <pxr/base/tf/singleton.h>
 #include <pxr/pxr.h>
 
-using namespace pxr;
+//using namespace pxr;
 
 // OSPRAY
 
 #include <ospray/ospray.h>
 
 
-//PXR_NAMESPACE_OPEN_SCOPE
+PXR_NAMESPACE_OPEN_SCOPE
 
 /// \class HdOSPRayConfig
 ///
@@ -66,7 +66,7 @@ public:
     /// How many samples does each pixel get per frame?
     ///
     /// Override with *HDOSPRAY_SAMPLES_PER_FRAME*.
-    unsigned int samplesPerFrame;
+    //unsigned int samplesPerFrame;
 
     /// How many samples do we need before a pixel is considered
     /// converged?
@@ -78,23 +78,23 @@ public:
     /// camera ray?
     ///
     /// Override with *HDOSPRAY_AMBIENT_OCCLUSION_SAMPLES*.
-    unsigned int ambientOcclusionSamples;
+    //unsigned int ambientOcclusionSamples;
 
     /// What should the intensity of the camera light be, specified as a
     /// percent of <1, 1, 1>.  For example, 300 would be <3, 3, 3>.
     ///
     /// Override with *HDOSPRAY_CAMERA_LIGHT_INTENSITY*.
-    float cameraLightIntensity;
+    //float cameraLightIntensity;
 
     ///  Whether OSPRay uses path tracing or scivis renderer.
     ///
     /// Override with *HDOSPRAY_USE_PATHTRACING*.
-    bool usePathTracing;
+	//bool usePathTracing { true };
 
     ///  Whether OSPRay uses denoiser
     ///
     /// Override with *HDOSPRAY_USE_DENOISER*.
-    bool useDenoiser;
+	bool useDenoiser { true };
 
     /// Initialization arguments sent to OSPRay.
     ///  This can be used to set ospray configurations like mpi.
@@ -105,51 +105,51 @@ public:
     ///  Whether OSPRay forces quad meshes for debug
     ///
     /// Override with *HDOSPRAY_FORCE_QUADRANGULATE*.
-    bool forceQuadrangulate;
+    //bool forceQuadrangulate;
 
     ///  Maximum ray depth
     ///
     /// Override with *HDOSPRAY_MAX_DEPTH*.
-    int maxDepth { 8 };
+    //int maxDepth { 8 };
 
     ///  Ao rays maximum distance
     ///
     /// Override with *HDOSPRAY_AO_DISTANCE*.
-    float aoDistance { 15.0f };
+    //float aoDistance { 15.0f };
 
     ///  Use an ambient light
     ///
     /// Override with *HDOSPRAY_AMBIENT_LIGHT*.
-    bool ambientLight { true };
+    //bool ambientLight { true };
 
     ///  Use an eye light
     ///
     /// Override with *HDOSPRAY_STATIC_DIRECTIONAL_LIGHTS*.
-    bool staticDirectionalLights { true };
+    //bool staticDirectionalLights { true };
 
     ///  Use an eye light
     ///
     /// Override with *HDOSPRAY_EYE_LIGHT*.
-    bool eyeLight { false };
+    //bool eyeLight { false };
 
     ///  Use a key light
     ///
     /// Override with *HDOSPRAY_KEY_LIGHT*.
-    bool keyLight { true };
+    //bool keyLight { true };
 
     ///  Use a fill light
     ///
     /// Override with *HDOSPRAY_FILL_LIGHT*.
-    bool fillLight { true };
+    //bool fillLight { true };
 
     ///  Use a back light
     ///
     /// Override with *HDOSPRAY_BACK_LIGHT*.
-    bool backLight { true };
+    //bool backLight { true };
 
     // meshes populate global instances.  These are then committed by the
     // renderPass into a scene.
-    std::vector<OSPGeometry> ospInstances;
+    //std::vector<OSPInstance> ospInstances;
 
 private:
     // The constructor initializes the config variables with their
@@ -164,6 +164,6 @@ private:
     friend class TfSingleton<HdOSPRayConfig>;
 };
 
-//PXR_NAMESPACE_CLOSE_SCOPE
+PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif // HDOSPRAY_CONFIG_H

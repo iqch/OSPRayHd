@@ -44,12 +44,12 @@
 #include "pxr/imaging/hdSt/drawItem.h"
 
 
-using namespace pxr;
+//using namespace pxr;
 
 // OSPRAY
 #include <ospray/ospray.h>
 
-//PXR_NAMESPACE_OPEN_SCOPE
+PXR_NAMESPACE_OPEN_SCOPE
 
 //class HdStDrawItem;
 class HdOSPRayRenderParam;
@@ -177,7 +177,7 @@ protected:
 
 private:
     // Populate the ospray geometry object based on scene data.
-    void _PopulateOSPMesh(HdSceneDelegate* sceneDelegate, OSPRenderer renderer,
+    void _PopulateOSPMesh(HdSceneDelegate* sceneDelegate, //OSPRenderer renderer,
                           HdDirtyBits* dirtyBits, HdMeshReprDesc const& desc,
                           HdOSPRayRenderParam* renderParam);
 
@@ -198,19 +198,19 @@ private:
 
     // Every HdOSPRayMesh is treated as instanced; if there's no instancer,
     // the prototype has a single identity istance.
-    OSPGeometry _ospMesh;
+    OSPGeometry _mesh;
 
-	OSPGeometricModel _ospGModel;
+	OSPGeometricModel _model;
 
-	OSPGroup _ospGroup;
+	OSPGroup _group;
 
-	OSPInstance  _instanceModel;
+	OSPInstance  _instance;
 	
 	//OSPWorld _instanceModel;
 
     // Each instance of the mesh in the top-level scene is stored in
     // _ospInstances.
-    std::vector<OSPGeometry> _ospInstances;
+    std::vector<OSPInstance> _ospInstances;
 
     // Cached scene data. VtArrays are reference counted, so as long as we
     // only call const accessors keeping them around doesn't incur a buffer
@@ -268,6 +268,6 @@ private:
     HdOSPRayMesh& operator=(const HdOSPRayMesh&) = delete;
 };
 
-//PXR_NAMESPACE_CLOSE_SCOPE
+PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif // HDOSPRAY_MESH_H

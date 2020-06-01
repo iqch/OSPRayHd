@@ -26,10 +26,10 @@
 
 #include <pxr/pxr.h>
 #include <pxr/imaging/hd/rendererPlugin.h>
+//
+//using namespace pxr;
 
-using namespace pxr;
-
-//PXR_NAMESPACE_OPEN_SCOPE
+PXR_NAMESPACE_OPEN_SCOPE
 
 ///
 /// \class HdOSPRayRendererPlugin
@@ -44,22 +44,25 @@ using namespace pxr;
 ///
 class HdOSPRayRendererPlugin final : public HdRendererPlugin {
 public:
-    HdOSPRayRendererPlugin() = default;
+	HdOSPRayRendererPlugin();
     virtual ~HdOSPRayRendererPlugin() = default;
 
     /// Construct a new render delegate of type HdOSPRayRenderDelegate.
     /// OSPRay render delegates own the OSPRay scene object, so a new render
     /// delegate should be created for each instance of HdRenderIndex.
     ///   \return A new HdOSPRayRenderDelegate object.
+	//__declspec(dllexport)
     virtual HdRenderDelegate* CreateRenderDelegate() override;
 
     /// Destroy a render delegate created by this class's CreateRenderDelegate.
     ///   \param renderDelegate The render delegate to delete.
+	//__declspec(dllexport)
     virtual void
     DeleteRenderDelegate(HdRenderDelegate* renderDelegate) override;
 
     /// Checks to see if the OSPRay plugin is supported on the running system
     ///
+	//__declspec(dllexport)
     virtual bool IsSupported() const override;
 
 private:
@@ -68,6 +71,6 @@ private:
     HdOSPRayRendererPlugin& operator=(const HdOSPRayRendererPlugin&) = delete;
 };
 
-//PXR_NAMESPACE_CLOSE_SCOPE
+PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif // HDOSPRAY_RENDERER_PLUGIN_H

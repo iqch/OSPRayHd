@@ -34,7 +34,7 @@ using namespace std;
 #include "sampler.h"
 
 
-//PXR_NAMESPACE_OPEN_SCOPE
+PXR_NAMESPACE_OPEN_SCOPE
 
 /// \class HdOSPRayPrototypeContext
 ///
@@ -57,6 +57,6 @@ struct HdOSPRayInstanceContext {
     /// The scene the prototype geometry lives in, for passing to
 };
 
-//PXR_NAMESPACE_CLOSE_SCOPE
+PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif // HDOSPRAY_CONTEXT_H

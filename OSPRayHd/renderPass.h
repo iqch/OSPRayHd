@@ -34,8 +34,8 @@
 
 // OSPRAY
 
-#include <ospcommon/math/vec.h>
-#include <ospcommon/math/AffineSpace.h>
+//#include <ospcommon/math/vec.h>
+//#include <ospcommon/math/AffineSpace.h>
 
 //using namespace ospcommon::math;
 
@@ -44,30 +44,24 @@
 
 // OIDN
 //#if HDOSPRAY_ENABLE_DENOISER
-#include <OpenImageDenoise/oidn.hpp>
+//#include <OpenImageDenoise/oidn.hpp>
 //#endif
 
-//PXR_NAMESPACE_OPEN_SCOPE
+// HDOSPRAY
+
+#include "renderParam.h"
+#include "renderBuffer.h"
+
+PXR_NAMESPACE_OPEN_SCOPE
 
 class HdOSPRayRenderParam;
 
-/// \class HdOSPRayRenderPass
-///
-/// HdRenderPass represents a single render iteration, rendering a view of the
-/// scene (the HdRprimCollection) for a specific viewer (the camera/viewport
-/// parameters in HdRenderPassState) to the current draw target.
-///
-/// This class does so by raycasting into the OSPRay scene.
-///
-class HdOSPRayRenderPass final : public HdRenderPass {
+class HdOSPRayRenderPass final : public HdRenderPass
+{
 public:
-    /// Renderpass constructor.
-    ///   \param index The render index containing scene data to render.
-    ///   \param collection The initial rprim collection for this renderpass.
-    ///   \param scene The OSPRay scene to raycast into.
     HdOSPRayRenderPass(HdRenderIndex* index,
                        HdRprimCollection const& collection,
-                       OSPRenderer renderer, std::atomic<int>* sceneVersion,
+                       std::atomic<int>* sceneVersion,
                        std::shared_ptr<HdOSPRayRenderParam> renderParam);
 
     /// Renderpass destructor.
@@ -101,10 +95,6 @@ private:
     // -----------------------------------------------------------------------
     // Internal API
 
-    // Specify a new viewport size for the sample buffer. Note: the caller
-    // should also call ResetImage().
-    void _ResizeSampleBuffer(unsigned int width, unsigned int height);
-
     // The sample buffer is cleared in Execute(), so this flag records whether
     // ResetImage() has been called since the last Execute().
     bool _pendingResetImage;
@@ -112,7 +102,17 @@ private:
 
     OSPFrameBuffer _frameBuffer { nullptr };
 
-    OSPRenderer _renderer;
+	OSPImageOperation _denoise { NULL };
+
+	OSPLight _sunlight;
+
+	OSPData _positions;
+	OSPGeometry _geometry;
+	OSPGeometricModel _model;
+	OSPMaterial _material;
+	OSPGroup _group;
+	OSPInstance _instance;
+	OSPData _instances;
 
     // A reference to the global scene version.
     std::atomic<int>* _sceneVersion;
@@ -121,59 +121,38 @@ private:
     int _lastRenderedModelVersion { -1 };
     int _lastSettingsVersion { -1 };
 
-    // The resolved output buffer, in GL_RGBA. This is an intermediate between
-    // _sampleBuffer and the GL framebuffer.
-    std::vector<ospcommon::math::vec4f> _colorBuffer;
+	HdRenderPassAovBindingVector _aovBindings;
+
+	HdOSPRayRenderBuffer* _colorBuffer;
+	HdOSPRayRenderBuffer* _depthBuffer; // { SdfPath::EmptyPath() };
+	HdOSPRayRenderBuffer* _normalBuffer; // { SdfPath::EmptyPath() };
+
+	OSPRenderer _renderer = nullptr;
+
+	OSPWorld _world = nullptr; // the last model created
 
     // The width of the viewport we're rendering into.
     unsigned int _width;
     // The height of the viewport we're rendering into.
     unsigned int _height;
 
-    OSPCamera _camera;
+	OSPCamera _camera = nullptr;
 
     // The inverse view matrix: camera space to world space.
     GfMatrix4d _inverseViewMatrix;
     // The inverse projection matrix: NDC space to camera space.
     GfMatrix4d _inverseProjMatrix;
 
-    // The color of a ray miss.
-    GfVec3f _clearColor;
-
     std::shared_ptr<HdOSPRayRenderParam> _renderParam;
 
-//#if HDOSPRAY_ENABLE_DENOISER
-    oidn::DeviceRef _denoiserDevice;
-    oidn::FilterRef _denoiserFilter;
-//#endif
 
-    bool _denoiserDirty { true };
-    std::vector< ospcommon::math::vec3f > _normalBuffer;
-    std::vector< ospcommon::math::vec3f > _albedoBuffer;
-    std::vector< ospcommon::math::vec4f > _denoisedBuffer;
+    bool _useDenoiser { true };
+    int _samplesToConvergence { 16 };
 
-    std::vector<OSPGeometry> oldInstances; // instances added to last model
-	//OSPModel oldModel = nullptr; // the last model created
-	OSPWorld oldModel = nullptr; // the last model created
 
-    int _numSamplesAccumulated { 0 }; // number of rendered frames not cleared
-    int _spp { 1 };
-    bool _useDenoiser { false };
-    int _samplesToConvergence { 100 };
-    int _denoiserSPPThreshold { 3 };
-    int _aoSamples { 1 };
-    bool _staticDirectionalLights { true };
-    bool _ambientLight { true };
-    bool _eyeLight { true };
-    bool _keyLight { true };
-    bool _fillLight { true };
-    bool _backLight { true };
-    int _maxDepth { 5 };
-    float _aoDistance { 10.f };
-
-    void Denoise();
+	bool _converged { false };
 };
 
-//PXR_NAMESPACE_CLOSE_SCOPE
+PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif // HDOSPRAY_RENDER_PASS_H
