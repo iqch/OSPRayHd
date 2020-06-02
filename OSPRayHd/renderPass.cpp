@@ -36,8 +36,8 @@
 
 // OIIO
 
-#include <OpenImageIO/imageio.h>
-OIIO_NAMESPACE_USING;
+//#include <OpenImageIO/imageio.h>
+//OIIO_NAMESPACE_USING;
 
 // OSPRAYHD
 
@@ -79,11 +79,9 @@ HdOSPRayRenderPass::HdOSPRayRenderPass(
 
 	ospCommit(_renderer);
 
-
     _camera = ospNewCamera("perspective");
 	ospSetFloat(_camera, "nearClip", 0.05);
-	//ospSetVec2f(_camera, "imageStart", 0.0, 1.0);
-	//ospSetVec2f(_camera, "imageEnd", 1.0, 0.0);
+
 	ospCommit(_camera);
 
 	_world = ospNewWorld();
@@ -91,33 +89,35 @@ HdOSPRayRenderPass::HdOSPRayRenderPass(
 	// JUST ONE DAYLIGHT
 
 	_sunlight = ospNewLight("sunSky");
-	ospSetVec3f(_sunlight, "direction", 0.0, 0.5, 0.5);
+	ospSetVec3f(_sunlight, "direction", 0.0, -0.5, -0.5);
 	ospSetFloat(_sunlight, "intensity", 1);
 	ospCommit(_sunlight);
 
 	ospSetObjectAsData(_world, "light", OSP_LIGHT, _sunlight);
 
-	//if(false)
+	if(false) // MINIMAL SCENE
 	{
 		_geometry = ospNewGeometry("sphere");
+		//ospRetain(geometry);
 
-		static float pos[] = { 0.0,0.0,0.0, 0.5,0.0,0.0 };
+		static float pos[] = { -0.5,0.0,0.0, 0.5,0.0,0.0 };
 
 		_positions = ospNewSharedData(pos, OSP_VEC3F, 2);
 		ospCommit(_positions);
 
 		ospSetObject(_geometry, "sphere.position", _positions);
-		ospSetFloat(_geometry, "radius", 0.15);
+		ospSetFloat(_geometry, "radius", 0.35);
 
 		ospCommit(_geometry);
 
-		 _model = ospNewGeometricModel(_geometry);
+		_model = ospNewGeometricModel(_geometry);
 
 
-		_material = ospNewMaterial("pathtracer", "obj");
+		_material = ospNewMaterial("pathtracer", "glass");
 
-		//ospSetFloat(MT, "attenuationDistance", 0.25);
-		//ospSetVec3f(MT, "attenuationColor", 1.0, 0.45, 0.15);
+		ospSetFloat(_material, "attenuationDistance", 0.25);
+		ospSetVec3f(_material, "attenuationColor", 1.0, 0.45, 0.15);
+
 		ospCommit(_material);
 
 		ospSetObject(_model, "material", _material);
@@ -126,6 +126,7 @@ HdOSPRayRenderPass::HdOSPRayRenderPass(
 		_group = ospNewGroup();
 
 		OSPData geometricModels = ospNewSharedData1D(&_model, OSP_GEOMETRIC_MODEL, 1);
+		ospCommit(geometricModels);
 		ospSetObject(_group, "geometry", geometricModels);
 		ospCommit(_group);
 
@@ -135,6 +136,8 @@ HdOSPRayRenderPass::HdOSPRayRenderPass(
 
 		// put the instance in the world
 		_instances = ospNewSharedData1D(&_instance, OSP_INSTANCE, 1);
+		ospCommit(_instances);
+
 		ospSetObject(_world, "instance", _instances);
 	}
 
@@ -155,7 +158,6 @@ HdOSPRayRenderPass::~HdOSPRayRenderPass()
 
 void HdOSPRayRenderPass::ResetImage()
 {
-    // Set a flag to clear the sample buffer the next time Execute() is called.
     _pendingResetImage = true;
 };
 
@@ -181,6 +183,8 @@ void
 HdOSPRayRenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
                              TfTokenVector const& renderTags)
 {
+	calls++;
+
 	_converged = false;
 
     HdRenderDelegate* renderDelegate = GetRenderIndex()->GetRenderDelegate();
@@ -222,18 +226,18 @@ HdOSPRayRenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
 	ospSetFloat(_camera, "nearClip", 0.005);
     ospCommit(_camera);
 
-    // update conig options
+    // update rendering options
     int currentSettingsVersion = renderDelegate->GetRenderSettingsVersion();
     if (_lastSettingsVersion != currentSettingsVersion)
 	{
         _samplesToConvergence = renderDelegate->GetRenderSetting<int>(
-               HdOSPRayRenderSettingsTokens->samplesToConvergence, 16);
+               HdOSPRayRenderSettingsTokens->samplesToConvergence, 1);
 		_useDenoiser = renderDelegate->GetRenderSetting<bool>(
-			HdOSPRayRenderSettingsTokens->useDenoiser, true);
+			HdOSPRayRenderSettingsTokens->useDenoiser, false);
 
         _lastSettingsVersion = currentSettingsVersion;
 
-		cout << "SAMPLES : " << _samplesToConvergence << endl;
+		//cout << "SAMPLES : " << _samplesToConvergence << endl;
 
         ResetImage();
 	};
@@ -249,46 +253,41 @@ HdOSPRayRenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
 		{
 			ospRelease(_frameBuffer);
 		};
+
         _frameBuffer = ospNewFrameBuffer(_width, _height, OSP_FB_RGBA32F,
-               OSP_FB_COLOR | OSP_FB_DEPTH | OSP_FB_VARIANCE | OSP_FB_ACCUM );
-		//cout << "NEW FRAMEBUFFER(" << _width << "x" << _height << ")" << endl;
+               OSP_FB_COLOR | OSP_FB_VARIANCE | OSP_FB_ACCUM );
+		cout << "NEW FRAMEBUFFER(" << _width << "x" << _height << ")" << endl;
 				
         ospCommit(_frameBuffer);
 
-
-
-		_aovBindings = renderPassState->GetAovBindings();
-
-		cout << "AOVS : " << _aovBindings.size() <<  endl;
-		for (HdRenderPassAovBinding& aov : _aovBindings)
+		if (_colorBuffer == NULL)
 		{
-			cout << aov.aovName << endl;
-			cout << aov.renderBuffer << endl;
-
-			if (aov.aovName == "color") _colorBuffer = (HdOSPRayRenderBuffer*)aov.renderBuffer;
-			if (aov.aovName == "depth") _depthBuffer = (HdOSPRayRenderBuffer*)aov.renderBuffer;
+			_aovBindings = renderPassState->GetAovBindings();
+			for (HdRenderPassAovBinding& aov : _aovBindings)
+			{
+				if (aov.aovName == "color") _colorBuffer = (HdOSPRayRenderBuffer*)aov.renderBuffer;
+				//if (aov.aovName == "depth") _depthBuffer = (HdOSPRayRenderBuffer*)aov.renderBuffer;
+			};
 		};
 
-		//if (aovBindings.size() == 0)
-		//{
-		//	cout << "BUILD AOV BUFFERS  : RGBA \n";
-		//	HdRenderPassAovBinding colorAov;
-		//	colorAov.aovName = HdAovTokens->color;
-		//	_colorBuffer = new HdOSPRayRenderBuffer();
-		//	colorAov.renderBuffer = _colorBuffer;
-		//	colorAov.clearValue = VtValue(GfVec4f(0.0707f, 0.0707f, 0.0707f, 1.0f));
-		//	aovBindings.push_back(colorAov);
+		if (_colorBuffer == NULL)
+		{
+			cout << "NON ALLOCATED STILL" << endl;
+		}
+		else
+		{
+			cout << "CBUFF(" << _colorBuffer->GetWidth() << "x" <<
+				_colorBuffer->GetHeight() << ")\n";
+		}
 
-		//	//renderPassState->SetAovBindings(aovBindings);
-		//}
-		//else
-		//{
 
-		//}
+
+		//_colorBuffer->Map();
 
 		//_colorBuffer->Allocate(GfVec3i(_width, _height, 1), HdFormatFloat32Vec4, false);
-		//_depthBuffer->Allocate(GfVec3i(_width,_height,1), HdFormatFloat32, false);
-		//_normalBuffer.Allocate(GfVec3i(_width, _height, 1), HdFormatFloat32Vec3, false);
+
+		//_colorBuffer->Unmap();
+
 		_pendingResetImage = true;
 	};
 
@@ -309,41 +308,42 @@ HdOSPRayRenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
 
     if (_pendingModelUpdate)
 	{
-		//int instnum = _renderParam->GetInstances().size();
-		//vector<OSPInstance>& _instances = _renderParam->GetInstances();	
-		//OSPData instances = ospNewSharedData1D(&_instances[0], OSP_INSTANCE, instnum);
-		//ospSetObject(_world, "instance", instances);
-        //ospCommit(_world);
+		if (true)
+		{
+			int instnum = _renderParam->GetInstances().size();
+			vector<OSPInstance>& _instances = _renderParam->GetInstances();	
+			OSPData instances = ospNewSharedData1D(&_instances[0], OSP_INSTANCE, instnum);
+			ospCommit(instances);
+			ospSetObject(_world, "instance", instances);
+			ospCommit(_world);
+		};
 
         _pendingModelUpdate = false;
         _renderParam->ClearInstances();
+
+		ResetImage();
 	};
 
     // Reset the sample buffer if it's been requested.
     if (_pendingResetImage)
 	{
+		cout << "RESET ALL!" << endl;
 		ospResetAccumulation(_frameBuffer);
 
-		float zeroC[4] = { 0.0f,0.0f,0.0f,1.0f };
+		if (_colorBuffer != NULL)
+		{
+			float zeroC[4] = { 0.0f,0.0f,0.0f,1.0f };
 
-		_colorBuffer->Map();
-		_colorBuffer->Clear(4,zeroC);
-		_colorBuffer->Unmap();
-
-		float one = 10000000000.0;
-		_depthBuffer->Map();
-		_depthBuffer->Clear(1, &one);
-		_depthBuffer->Unmap();
-
-		//float zN[3] = { 0.0f,0.0f,1.0 };
-		//_normalBuffer.Map();
-		//_normalBuffer.Clear(3, zN);
-		//_normalBuffer.Unmap();
+			_colorBuffer->Map();
+			_colorBuffer->Clear(4,zeroC);
+			_colorBuffer->Unmap();
+		};
 
         _pendingResetImage = false;
 	};
 
-	//_renderParam.
+	cout << "rendering : " << calls << endl;
+
     // Render the frame
 	for (int i = 0; i < _samplesToConvergence-(_useDenoiser ? 1 : 0); i++)
 	{
@@ -378,50 +378,11 @@ HdOSPRayRenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
 
 		memcpy((void*)csrc, rgba, _width * _height * 4 * sizeof(float));
 
-		if(false)
-		{
-			// SAVE
-			const char *filename = "f:/temp/out/outdlg.png";
-			const int channels = 4; // RGB
-			ImageOutput* out = ImageOutput::create(filename);
-
-			unsigned char* RGBA = new unsigned char[_width*_height * 4];
-
-			for (int i = 0; i < _width*_height * 4; i++)
-			{
-				if (rgba[i] < 0.0f) { RGBA[i] = 0; continue; };
-				if (rgba[i] > 1.0f) { RGBA[i] = 255; continue; };
-				RGBA[i] = 255 * pow(rgba[i], 0.46);
-			};
-
-			ImageSpec spec(_width, _height, channels, TypeDesc::UINT8);
-			out->open(filename, spec);
-			out->write_image(TypeDesc::UINT8, RGBA);
-			out->close();
-
-			delete[] RGBA;
-		}
-
 		_colorBuffer->Unmap();
 
 		_colorBuffer->SetConverged(true);
 
 		ospUnmapFrameBuffer(rgba, _frameBuffer);
-	}
-
-	// DEPTH
-	if(_depthBuffer!=NULL)
-	{
-		//const float* depth = (const float*)ospMapFrameBuffer(_frameBuffer, OSP_FB_DEPTH);
-		//float* dsrc = (float*)(_depthBuffer->Map());
-
-		//memcpy((void*)dsrc, depth, _width * _height * sizeof(float));
-
-		//_depthBuffer->Unmap();
-
-		//_depthBuffer->SetConverged(true);
-
-		//ospUnmapFrameBuffer(depth, _frameBuffer);
 	}
 
 	// ALLES

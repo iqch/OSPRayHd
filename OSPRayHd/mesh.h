@@ -44,15 +44,16 @@
 #include "pxr/imaging/hdSt/drawItem.h"
 
 
-//using namespace pxr;
-
 // OSPRAY
 #include <ospray/ospray.h>
+
+// HDOSPRAY
+#include "renderParam.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 //class HdStDrawItem;
-class HdOSPRayRenderParam;
+//class HdOSPRayRenderParam;
 
 // class HdOSPRayPrototypeContext;
 // class HdOSPRayInstanceContext;
@@ -170,10 +171,10 @@ protected:
     virtual void _InitRepr(TfToken const& reprToken,
                            HdDirtyBits* dirtyBits) override;
 
-    void _UpdateDrawItemGeometricShader(HdSceneDelegate* sceneDelegate,
-                                        HdStDrawItem* drawItem,
-                                        const HdMeshReprDesc& desc,
-                                        size_t drawItemIdForDesc);
+    //void _UpdateDrawItemGeometricShader(HdSceneDelegate* sceneDelegate,
+    //                                    HdStDrawItem* drawItem,
+    //                                    const HdMeshReprDesc& desc,
+    //                                    size_t drawItemIdForDesc);
 
 private:
     // Populate the ospray geometry object based on scene data.
@@ -191,26 +192,21 @@ private:
     // context. Overwrites the current mapping for the name, if necessary.
     // This function's main purpose is to resolve the (interpolation, refined)
     // tuple into the concrete primvar sampler type.
-    void _CreatePrimvarSampler(TfToken const& name, VtValue const& data,
-                               HdInterpolation interpolation, bool refined);
+    //void _CreatePrimvarSampler(TfToken const& name, VtValue const& data,
+    //                           HdInterpolation interpolation, bool refined);
 
     OSPGeometry _CreateOSPRaySubdivMesh();
 
     // Every HdOSPRayMesh is treated as instanced; if there's no instancer,
     // the prototype has a single identity istance.
-    OSPGeometry _mesh;
-
-	OSPGeometricModel _model;
-
-	OSPGroup _group;
-
-	OSPInstance  _instance;
+	OSPGeometry _mesh { NULL };
+	OSPGeometricModel _model { NULL };
+	OSPGroup _group { NULL };
+	OSPInstance  _instance { NULL };
 	
-	//OSPWorld _instanceModel;
-
     // Each instance of the mesh in the top-level scene is stored in
     // _ospInstances.
-    std::vector<OSPInstance> _ospInstances;
+    //std::vector<OSPInstance> _ospInstances;
 
     // Cached scene data. VtArrays are reference counted, so as long as we
     // only call const accessors keeping them around doesn't incur a buffer
@@ -220,8 +216,8 @@ private:
     VtVec3fArray _points;
     VtVec2fArray _texcoords;
     VtVec3fArray _normals;
-    VtVec4fArray _colors;
-    GfVec4f _singleColor { .5f, .5f, .5f, 1.f };
+    //VtVec4fArray _colors;
+    //GfVec4f _singleColor { .5f, .5f, .5f, 1.f };
 
     // Derived scene data:
     // - _triangulatedIndices holds a triangulation of the source topology,
@@ -249,8 +245,8 @@ private:
     // Draw styles.
     bool _refined;
     bool _smoothNormals;
-    bool _doubleSided;
-    HdCullStyle _cullStyle;
+    //bool _doubleSided;
+    //HdCullStyle _cullStyle;
     int _tessellationRate { 32 };
 
     // A local cache of primvar scene data. "data" is a copy-on-write handle to

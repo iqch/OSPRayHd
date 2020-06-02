@@ -123,9 +123,9 @@ private:
 
 	HdRenderPassAovBindingVector _aovBindings;
 
-	HdOSPRayRenderBuffer* _colorBuffer;
-	HdOSPRayRenderBuffer* _depthBuffer; // { SdfPath::EmptyPath() };
-	HdOSPRayRenderBuffer* _normalBuffer; // { SdfPath::EmptyPath() };
+	HdOSPRayRenderBuffer* _colorBuffer { NULL };
+	//HdOSPRayRenderBuffer* _depthBuffer; // { SdfPath::EmptyPath() };
+	//HdOSPRayRenderBuffer* _normalBuffer; // { SdfPath::EmptyPath() };
 
 	OSPRenderer _renderer = nullptr;
 
@@ -151,6 +151,8 @@ private:
 
 
 	bool _converged { false };
+
+	int calls{ 0 };
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

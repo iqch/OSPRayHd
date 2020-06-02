@@ -330,30 +330,30 @@ void HdOSPRayMaterial::_ProcessUsdPreviewSurfaceNode(HdMaterialNode node)
 	{
         const auto& name = param->first;
         const auto& value = param->second;
-        if (name == HdOSPRayTokens->diffuseColor)
-		{
-            diffuseColor = value.Get<GfVec3f>();
-        } 
-		else if (name == HdOSPRayTokens->metallic)
-		{
-            metallic = value.Get<float>();
-        } 
-		else if (name == HdOSPRayTokens->roughness)
-		{
-            roughness = value.Get<float>();
-        }
-		else if (name == HdOSPRayTokens->ior)
-		{
-            ior = value.Get<float>();
-        } 
-		else if (name == HdOSPRayTokens->color)
-		{
-            diffuseColor = value.Get<GfVec3f>();
-        } 
-		else if (name == HdOSPRayTokens->opacity) 
-		{
-            opacity = value.Get<float>();
-		};
+  //      if (name == HdOSPRayTokens->diffuseColor)
+		//{
+  //          diffuseColor = value.Get<GfVec3f>();
+  //      } 
+		//else if (name == HdOSPRayTokens->metallic)
+		//{
+  //          metallic = value.Get<float>();
+  //      } 
+		//else if (name == HdOSPRayTokens->roughness)
+		//{
+  //          roughness = value.Get<float>();
+  //      }
+		//else if (name == HdOSPRayTokens->ior)
+		//{
+  //          ior = value.Get<float>();
+  //      } 
+		//else if (name == HdOSPRayTokens->color)
+		//{
+  //          diffuseColor = value.Get<GfVec3f>();
+  //      } 
+		//else if (name == HdOSPRayTokens->opacity) 
+		//{
+  //          opacity = value.Get<float>();
+		//};
 	};
 };
 
@@ -409,57 +409,57 @@ HdOSPRayMaterial::_ProcessTextureNode(HdMaterialNode node, TfToken textureName)
 	{
         map_diffuseColor = texture;
     } 
-	else if (textureName == HdOSPRayTokens->metallic)
-	{
-        map_metallic = texture;
-    } 
-	else if (textureName == HdOSPRayTokens->roughness)
-	{
-        map_roughness = texture;
-    } 
-	else if (textureName == HdOSPRayTokens->normal)
-	{
-        map_normal = texture;
-    } 
-	else
+	//else if (textureName == HdOSPRayTokens->metallic)
+	//{
+ //       map_metallic = texture;
+ //   } 
+	//else if (textureName == HdOSPRayTokens->roughness)
+	//{
+ //       map_roughness = texture;
+ //   } 
+	//else if (textureName == HdOSPRayTokens->normal)
+	//{
+ //       map_normal = texture;
+ //   } 
+	//else
 	{
 		std::cout << "unhandled texToken: " << textureName.GetString() << std::endl;
 	};
 };
 
-OSPMaterial
-HdOSPRayMaterial::CreateDefaultMaterial(GfVec4f color)
-{
-	OSPMaterial ospMaterial = ospNewMaterial("pathtracer", "obj");
-	ospCommit(ospMaterial);
-	return ospMaterial;
-
-
-	//std::string rendererType = HdOSPRayConfig::GetInstance().usePathTracing
-	//	? "pathtracer"
-	//	: "scivis";
-	
-	std::string rendererType =  "pathtracer";
-    
-	//OSPMaterial ospMaterial;
-    if (rendererType == "pathtracer")
-	{
-		ospMaterial = ospNewMaterial(rendererType.c_str(), "principled");
-		ospSetVec3f(ospMaterial, "baseColor", color[0], color[1], color[2]);
-    } 
-	else
-	{
-		ospMaterial = ospNewMaterial(rendererType.c_str(), "obj");
-        // Carson: apparently colors are actually stored as a single color value
-        // for entire object
-		ospSetFloat(ospMaterial, "Ns", 10.f);
-		ospSetVec3f(ospMaterial, "Ks", 0.2f, 0.2f, 0.2f);
-		ospSetVec3f(ospMaterial, "Kd", color[0], color[1], color[2]);
-		ospSetFloat(ospMaterial, "d", color.data()[3]);
-	};
-
-    ospCommit(ospMaterial);
-    return ospMaterial;
-}
+//OSPMaterial
+//HdOSPRayMaterial::CreateDefaultMaterial(GfVec4f color)
+//{
+//	OSPMaterial ospMaterial = ospNewMaterial("pathtracer", "obj");
+//	ospCommit(ospMaterial);
+//	return ospMaterial;
+//
+//
+//	////std::string rendererType = HdOSPRayConfig::GetInstance().usePathTracing
+//	////	? "pathtracer"
+//	////	: "scivis";
+//	//
+//	//std::string rendererType =  "pathtracer";
+// //   
+//	////OSPMaterial ospMaterial;
+// //   if (rendererType == "pathtracer")
+//	//{
+//	//	ospMaterial = ospNewMaterial(rendererType.c_str(), "principled");
+//	//	ospSetVec3f(ospMaterial, "baseColor", color[0], color[1], color[2]);
+// //   } 
+//	//else
+//	//{
+//	//	ospMaterial = ospNewMaterial(rendererType.c_str(), "obj");
+// //       // Carson: apparently colors are actually stored as a single color value
+// //       // for entire object
+//	//	ospSetFloat(ospMaterial, "Ns", 10.f);
+//	//	ospSetVec3f(ospMaterial, "Ks", 0.2f, 0.2f, 0.2f);
+//	//	ospSetVec3f(ospMaterial, "Kd", color[0], color[1], color[2]);
+//	//	ospSetFloat(ospMaterial, "d", color.data()[3]);
+//	//};
+//
+// //   ospCommit(ospMaterial);
+// //   return ospMaterial;
+//}
 
 PXR_NAMESPACE_CLOSE_SCOPE

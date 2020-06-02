@@ -72,7 +72,7 @@ public:
     /// converged?
     ///
     /// Override with *HDOSPRAY_SAMPLES_TO_CONVERGENCE*.
-    unsigned int samplesToConvergence;
+	unsigned int samplesToConvergence { 1 };
 
     /// How many ambient occlusion rays should we generate per
     /// camera ray?

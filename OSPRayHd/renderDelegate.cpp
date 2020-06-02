@@ -238,11 +238,6 @@ HdOSPRayRenderDelegate::HdOSPRayRenderDelegate(
 void
 HdOSPRayRenderDelegate::_Initialize()
 {
-    // Check plugin against pxr version
-//#if PXR_MAJOR_VERSION != 0 || PXR_MINOR_VERSION != 19
-//#    error This version of HdOSPRay is configured to built against USD v0.19.x
-//#endif
-
 	if (device == NULL)
 	{
 		int ac = 1;
@@ -276,26 +271,15 @@ HdOSPRayRenderDelegate::_Initialize()
 			return;
 		};
 
-		//ospDeviceSetStatusFunc(device, [](const char* msg) { std::cout << msg; });
 		ospDeviceSetStatusFunc(device, HdOSPRayRenderDelegate::HandleOSPRayStatusMsg);
 		ospDeviceSetErrorFunc(device, HdOSPRayRenderDelegate::HandleOSPRayError);
-		//	[](OSPError e, const char* msg) { std::cerr << "OSPRAY ERROR [" << e << "]: " << msg << std::endl; });
 
 		ospDeviceCommit(device);
-
-		//if (ospGetCurrentDevice() == nullptr)
-		//{
-		//	// user most likely specified bad arguments, retry without them
-		//	ac = 1;
-		//	ospInit(&ac, av);
-		//};
 
 		delete[] av;
 	}
 
-   // ospLoadModule("ptex"); // DO IT LATER
-
-
+    ospLoadModule("ptex");
 	ospLoadModule("denoiser");
 
     _renderParam = std::make_shared<HdOSPRayRenderParam>(&_sceneVersion);
