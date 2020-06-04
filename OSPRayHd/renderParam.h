@@ -84,6 +84,14 @@ public:
     // not thread safe
 	std::vector<OSPInstance>& GetInstances() { return _ospInstances; };
 
+	// POSSIBLE - MATLIB???
+
+	OSPMaterial _material{ NULL };
+	//OSPTexture _texture{ NULL };
+	//OSPData _textureData { NULL };
+
+	bool degrading{ false };
+
 private:
     // mutex over ospray calls to the global model and global instances. OSPRay
     // is not thread safe

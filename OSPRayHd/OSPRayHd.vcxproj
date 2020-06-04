@@ -40,6 +40,7 @@
     <ClInclude Include="renderParam.h" />
     <ClInclude Include="renderPass.h" />
     <ClInclude Include="sampler.h" />
+    <ClInclude Include="subd.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="config.cpp" />
@@ -51,6 +52,7 @@
     <ClCompile Include="rendererPlugin.cpp" />
     <ClCompile Include="renderPass.cpp" />
     <ClCompile Include="sampler.cpp" />
+    <ClCompile Include="subd.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>

@@ -50,6 +50,7 @@
 #include "mesh.h"
 #include "renderDelegate.h"
 
+bool trueScene = true;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -70,7 +71,6 @@ HdOSPRayRenderPass::HdOSPRayRenderPass(
     , _inverseViewMatrix(1.0f) // == identity
     , _inverseProjMatrix(1.0f) // == identity
     , _renderParam(renderParam)
-	//, _colorBuffer(SdfPath::EmptyPath())
 {
 	_renderer = ospNewRenderer("pathtracer");
 
@@ -95,32 +95,79 @@ HdOSPRayRenderPass::HdOSPRayRenderPass(
 
 	ospSetObjectAsData(_world, "light", OSP_LIGHT, _sunlight);
 
-	if(false) // MINIMAL SCENE
+	if(!trueScene) // MINIMAL SCENE
 	{
-		_geometry = ospNewGeometry("sphere");
-		//ospRetain(geometry);
+		_geometry = ospNewGeometry("subdivision");
 
-		static float pos[] = { -0.5,0.0,0.0, 0.5,0.0,0.0 };
+		static float pos[] = { 
+			-1.0,	-1.0,	0.0, 
+			-1.0,	1.0,	0.0,
+			1.0,	1.0,	0.0, 
+			1.0,	-1.0,	0.0,
+			-1.5,	0.0,	0.0
+		};
 
-		_positions = ospNewSharedData(pos, OSP_VEC3F, 2);
+		_positions = ospNewSharedData(pos, OSP_VEC3F, 5);
 		ospCommit(_positions);
 
-		ospSetObject(_geometry, "sphere.position", _positions);
-		ospSetFloat(_geometry, "radius", 0.35);
+		ospSetObject(_geometry, "vertex.position", _positions);
+
+
+		static unsigned int indices[] = { 0,1,2,3,0,1,4 };
+
+		_indices = ospNewSharedData(indices, OSP_UINT, 7);
+		ospCommit(_indices);
+
+		ospSetObject(_geometry, "index", _indices);
+
+		static float uv[] = {
+			0.0,	0.0,
+			0.0,	1.0,
+			1.0,	1.0,
+			1.0,	0.0,
+
+			0.5,	0.5 };
+
+		_texcoord = ospNewSharedData(uv, OSP_VEC2F, 5);
+		ospCommit(_texcoord);
+
+		ospSetObject(_geometry, "vertex.texcoord", _texcoord);
+
+		unsigned int faces[] = { 4, 3 };
+		_faces = ospNewSharedData(faces, OSP_UINT, 2);
+		ospCommit(_faces);
+		
+		ospSetObject(_geometry, "face", _faces);
+
+
+		ospSetFloat(_geometry, "level", 15.0f);
+
+		ospSetInt(_geometry, "mode", OSP_SUBDIVISION_PIN_ALL);
+
+
+		//ospRetain(geometry);
+
+		//static float pos[] = { 0.0,0.0,0.0, 0.5,0.0,0.0 };
+
+		//_positions = ospNewSharedData(pos, OSP_VEC3F, 1);
+		//ospCommit(_positions);
+
+		//ospSetObject(_geometry, "sphere.position", _positions);
+		//ospSetFloat(_geometry, "radius", 1.0);
 
 		ospCommit(_geometry);
 
 		_model = ospNewGeometricModel(_geometry);
 
 
-		_material = ospNewMaterial("pathtracer", "glass");
+		//_material = ospNewMaterial("pathtracer", "glass");
 
-		ospSetFloat(_material, "attenuationDistance", 0.25);
-		ospSetVec3f(_material, "attenuationColor", 1.0, 0.45, 0.15);
+		//ospSetFloat(_material, "attenuationDistance", 0.25);
+		//ospSetVec3f(_material, "attenuationColor", 1.0, 0.45, 0.15);
 
-		ospCommit(_material);
+		//ospCommit(_material);
 
-		ospSetObject(_model, "material", _material);
+		ospSetObject(_model, "material", renderParam->_material);
 		ospCommit(_model);
 
 		_group = ospNewGroup();
@@ -183,9 +230,10 @@ void
 HdOSPRayRenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
                              TfTokenVector const& renderTags)
 {
-	calls++;
+	bool render = false;
+	//calls++;
 
-	_converged = false;
+	//_converged = false;
 
     HdRenderDelegate* renderDelegate = GetRenderIndex()->GetRenderDelegate();
 
@@ -195,36 +243,40 @@ HdOSPRayRenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
 	GfMatrix4d inverseProjMatrix
            = renderPassState->GetProjectionMatrix().GetInverse();
 
-    if (inverseViewMatrix != _inverseViewMatrix
-        || inverseProjMatrix != _inverseProjMatrix) 
+	if (inverseViewMatrix != _inverseViewMatrix
+		|| inverseProjMatrix != _inverseProjMatrix)
 	{
-        ResetImage();
-        _inverseViewMatrix = inverseViewMatrix;
-        _inverseProjMatrix = inverseProjMatrix;
-    }
+		ResetImage();
+		_inverseViewMatrix = inverseViewMatrix;
+		_inverseProjMatrix = inverseProjMatrix;
 
-    float aspect = _width / float(_height);
+		float aspect = _width / float(_height);
 
+		ospSetFloat(_camera, "aspect", aspect);
+		GfVec3f origin = GfVec3f(0, 0, 0);
+		GfVec3f dir = GfVec3f(0, 0, -1);
+		GfVec3f up = GfVec3f(0, 1, 0);
+		dir = _inverseProjMatrix.Transform(dir);
+		origin = _inverseViewMatrix.Transform(origin);
+		dir = _inverseViewMatrix.TransformDir(dir).GetNormalized();
+		up = _inverseViewMatrix.TransformDir(up).GetNormalized();
 
-    ospSetFloat(_camera, "aspect", aspect);
-    GfVec3f origin = GfVec3f(0, 0, 0);
-    GfVec3f dir = GfVec3f(0, 0, -1);
-    GfVec3f up = GfVec3f(0, 1, 0);
-    dir = _inverseProjMatrix.Transform(dir);
-    origin = _inverseViewMatrix.Transform(origin);
-    dir = _inverseViewMatrix.TransformDir(dir).GetNormalized();
-    up = _inverseViewMatrix.TransformDir(up).GetNormalized();
+		double prjMatrix[4][4];
+		renderPassState->GetProjectionMatrix().Get(prjMatrix);
+		float fov = 2.0 * std::atan(1.0 / prjMatrix[1][1]) * 180.0 / M_PI;
 
-    double prjMatrix[4][4];
-    renderPassState->GetProjectionMatrix().Get(prjMatrix);
-    float fov = 2.0 * std::atan(1.0 / prjMatrix[1][1]) * 180.0 / M_PI;
+		ospSetVec3f(_camera, "position", origin[0], origin[1], origin[2]);
+		ospSetVec3f(_camera, "direction", dir[0], dir[1], dir[2]);
+		ospSetVec3f(_camera, "up", up[0], up[1], up[1]);
+		ospSetFloat(_camera, "fovy", fov);
+		ospSetFloat(_camera, "nearClip", 0.005);
+		ospCommit(_camera);
 
-    ospSetVec3f(_camera, "position", origin[0], origin[1], origin[2]);
-    ospSetVec3f(_camera, "direction", dir[0], dir[1], dir[2]);
-    ospSetVec3f(_camera, "up", up[0],up[1],up[1]);
-	ospSetFloat(_camera, "fovy", fov);
-	ospSetFloat(_camera, "nearClip", 0.005);
-    ospCommit(_camera);
+		//cout << "CAM P : " << origin << endl;
+		//cout << "CAM D : " << dir << endl;
+
+		render = true;
+	}
 
     // update rendering options
     int currentSettingsVersion = renderDelegate->GetRenderSettingsVersion();
@@ -240,6 +292,8 @@ HdOSPRayRenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
 		//cout << "SAMPLES : " << _samplesToConvergence << endl;
 
         ResetImage();
+
+		render = true;
 	};
 
 
@@ -247,6 +301,8 @@ HdOSPRayRenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
     GfVec4f vp = renderPassState->GetViewport();
     if (_width != vp[2] || _height != vp[3])
 	{
+		render = true;
+
         _width = vp[2];
         _height = vp[3];
 		if (_frameBuffer)
@@ -294,40 +350,48 @@ HdOSPRayRenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
     int currentSceneVersion = _sceneVersion->load();
     if (_lastRenderedVersion != currentSceneVersion)
 	{
-        ResetImage();
+		render = true;
+		ResetImage();
         _lastRenderedVersion = currentSceneVersion;
 	};
 
     int currentModelVersion = _renderParam->GetModelVersion();
     if (_lastRenderedModelVersion != currentModelVersion)
 	{
-        ResetImage();
+		render = true;
+		ResetImage();
         _lastRenderedModelVersion = currentModelVersion;
         _pendingModelUpdate = true;
 	};
 
     if (_pendingModelUpdate)
 	{
-		if (true)
+		if (trueScene)
 		{
 			int instnum = _renderParam->GetInstances().size();
-			vector<OSPInstance>& _instances = _renderParam->GetInstances();	
-			OSPData instances = ospNewSharedData1D(&_instances[0], OSP_INSTANCE, instnum);
-			ospCommit(instances);
-			ospSetObject(_world, "instance", instances);
-			ospCommit(_world);
+
+			if (instnum > 0)
+			{
+				vector<OSPInstance>& _instances = _renderParam->GetInstances();	
+				OSPData instances = ospNewSharedData1D(&_instances[0], OSP_INSTANCE, instnum);
+				ospCommit(instances);
+				ospSetObject(_world, "instance", instances);
+				ospCommit(_world);
+			};
 		};
 
         _pendingModelUpdate = false;
         _renderParam->ClearInstances();
 
 		ResetImage();
+		render = true;
 	};
 
     // Reset the sample buffer if it's been requested.
     if (_pendingResetImage)
 	{
-		cout << "RESET ALL!" << endl;
+		render = true;
+		//cout << "RESET ALL!" << endl;
 		ospResetAccumulation(_frameBuffer);
 
 		if (_colorBuffer != NULL)
@@ -342,24 +406,40 @@ HdOSPRayRenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
         _pendingResetImage = false;
 	};
 
-	cout << "rendering : " << calls << endl;
 
     // Render the frame
-	for (int i = 0; i < _samplesToConvergence-(_useDenoiser ? 1 : 0); i++)
+	while (render)
 	{
-		ospRenderFrameBlocking(_frameBuffer, _renderer, _camera, _world);
-	};
+		//cout << "rendering : " << calls << (_renderParam->degrading ? "*" : "") << endl;
 
-	OSPData ops = ospNewSharedData1D(&_denoise, OSP_IMAGE_OPERATION, 1);
+		if (_renderParam->degrading) // SHORT CIRCUIT
+		{
+			calls++;
+			ospRenderFrameBlocking(_frameBuffer, _renderer, _camera, _world);
+			break;
+		};
 
-	if (_useDenoiser)
-	{
-		ospSetObject(_frameBuffer, "imageOperation", ops);
-		ospCommit(_frameBuffer);
-		ospRenderFrameBlocking(_frameBuffer, _renderer, _camera, _world);
-		ospSetObject(_frameBuffer, "imageOperation", NULL);
-		ospCommit(_frameBuffer);
-	};
+		// COMMON WAY
+		for (int i = 0; i < _samplesToConvergence-(_useDenoiser ? 1 : 0); i++)
+		{
+			ospRenderFrameBlocking(_frameBuffer, _renderer, _camera, _world);
+		};
+
+		OSPData ops = ospNewSharedData1D(&_denoise, OSP_IMAGE_OPERATION, 1);
+
+		if (_useDenoiser)
+		{
+			ospSetObject(_frameBuffer, "imageOperation", ops);
+			ospCommit(_frameBuffer);
+			ospRenderFrameBlocking(_frameBuffer, _renderer, _camera, _world);
+			ospSetObject(_frameBuffer, "imageOperation", NULL);
+			ospCommit(_frameBuffer);
+		};
+		calls++;
+
+		break;
+	}
+
                          
 	// COLOR
 	if(_colorBuffer != NULL)
@@ -367,14 +447,7 @@ HdOSPRayRenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
 		const float* rgba = (const float*)ospMapFrameBuffer(_frameBuffer, OSP_FB_COLOR);
 		float* csrc = (float*)(_colorBuffer->Map());
 
-		// ...MOVE DATA TO BUFFER
-		//int idx = 0;
-		//for (int i = 0; i < _width; i++)
-		//for (int j = 0; j < _height; j++)
-		//{
-		//	_colorBuffer->Write(GfVec3i(i, j, 1), 4, rgba + idx);
-		//	idx += 4;
-		//};
+		// MOVE DATA TO BUFFER
 
 		memcpy((void*)csrc, rgba, _width * _height * 4 * sizeof(float));
 
@@ -383,7 +456,7 @@ HdOSPRayRenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
 		_colorBuffer->SetConverged(true);
 
 		ospUnmapFrameBuffer(rgba, _frameBuffer);
-	}
+	};
 
 	// ALLES
 

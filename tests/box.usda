@@ -1,0 +1,64 @@
+#usda 1.0
+(
+    defaultPrim = "sopimport1"
+    doc = """Generated from Composed Stage of root layer 
+"""
+)
+
+def Xform "sopimport1" (
+    customData = {
+        int HoudiniPrimEditorNodeId = 285
+    }
+    kind = "component"
+)
+{
+    custom bool doubleSided = 1
+
+    def Mesh "mesh_0"
+    {
+        float3[] extent = [(-0.5, -0.5, -0.5), (0.5, 0.5, 0.5)]
+        int[] faceVertexCounts = [4, 4, 4, 4, 4, 4] (
+            customData = {
+                int64 HoudiniDataId = 2654443518
+            }
+        )
+        int[] faceVertexIndices = [1, 0, 4, 5, 2, 1, 5, 6, 3, 2, 6, 7, 0, 3, 7, 4, 2, 3, 0, 1, 5, 4, 7, 6] (
+            customData = {
+                int64 HoudiniDataId = 2654443518
+            }
+        )
+        uniform token orientation = "rightHanded"
+        point3f[] points = [(-0.5, -0.5, -0.5), (0.5, -0.5, -0.5), (0.5, -0.5, 0.5), (-0.5, -0.5, 0.5), (-0.5, 0.5, -0.5), (0.5, 0.5, -0.5), (0.5, 0.5, 0.5), (-0.5, 0.5, 0.5)] (
+            customData = {
+                int64 HoudiniDataId = 7746
+            }
+            interpolation = "vertex"
+        )
+        string[] primvars:shop_materialpath = ["/obj/platonic_object1/uvquickshade1/shop_definition/texture_material", "/obj/platonic_object1/uvquickshade1/shop_definition/texture_material", "/obj/platonic_object1/uvquickshade1/shop_definition/texture_material", "/obj/platonic_object1/uvquickshade1/shop_definition/texture_material", "/obj/platonic_object1/uvquickshade1/shop_definition/texture_material", "/obj/platonic_object1/uvquickshade1/shop_definition/texture_material"] (
+            customData = {
+                int64 HoudiniDataId = 8002
+            }
+            interpolation = "uniform"
+        )
+        int[] primvars:shop_materialpath:indices = None
+        texCoord2f[] primvars:st = [(-5.9604645e-8, 0), (1, 0), (1, 1), (-5.9604645e-8, 1), (0, 2.9802322e-8), (1, 2.9802322e-8), (1, 1), (0, 1), (0, 0), (1, 0), (1, 1), (0, 1), (2.9802322e-8, 2.9802322e-8), (1, 2.9802322e-8), (1, 1), (2.9802322e-8, 1), (1, 1), (2.9802322e-8, 1), (2.9802322e-8, 2.9802322e-8), (1, 2.9802322e-8), (1, 1), (2.9802322e-8, 1), (2.9802322e-8, 0), (1, 0)] (
+            customData = {
+                int64 HoudiniDataId = 8066
+            }
+            interpolation = "faceVarying"
+        )
+        int[] primvars:st:indices = None
+        uniform token subdivisionScheme = "catmullClark"
+    }
+}
+
+def HoudiniLayerInfo "HoudiniLayerInfo" (
+    customData = {
+        string HoudiniCreatorNode = "/stage/editproperties1"
+        string[] HoudiniEditorNodes = ["/stage/editproperties1"]
+        string HoudiniSaveControl = "Placeholder"
+    }
+)
+{
+}
+

@@ -22,8 +22,6 @@
 // language governing permissions and limitations under the Apache License.
 //
 
-#define NOMINMAX
-
 
 // PXR
 #include <pxr/imaging/glf/glew.h>
@@ -65,19 +63,13 @@ TF_DEFINE_PRIVATE_TOKENS(
 );
 // clang-format on
 
-// USD forces warnings when converting ospcommon::affine3f to osp::affine3f
-//const ospcommon::math::affine3f Identity({ 1, 0, 0, 0, 1, 0, 0, 0, 1 });
-
-
-
 void
 HdOSPRayMesh::_InitRepr(TfToken const& reprToken, HdDirtyBits* dirtyBits)
 {
     TF_UNUSED(dirtyBits);
 
     // Create an empty repr.
-    _ReprVector::iterator it = std::find_if(
-		_reprs.begin(), _reprs.end(), _ReprComparator(reprToken));
+    _ReprVector::iterator it = std::find_if(_reprs.begin(), _reprs.end(), _ReprComparator(reprToken));
 
 	if (it == _reprs.end()) 
 	{
@@ -138,7 +130,6 @@ HdOSPRayMesh::Sync(HdSceneDelegate* sceneDelegate, HdRenderParam* renderParam,
     // Pull top-level OSPRay state out of the render param.
     HdOSPRayRenderParam* ospRenderParam
            = (HdOSPRayRenderParam*)renderParam;
-	 // JUST FOR KEEPING INSTANCE MADE
 
     // Create ospray geometry objects.
     _PopulateOSPMesh(sceneDelegate, dirtyBits, desc, ospRenderParam);
@@ -160,6 +151,15 @@ HdOSPRayMesh::_PopulateOSPMesh(
 
 	SdfPath const& id = GetId();
 
+	// POOR MAN DEGRADATION METRCS COMPUTING
+	bool deg = desc.geomStyle == HdMeshGeomStyleHullEdgeOnly;
+
+	if (deg != renderParam->degrading)
+	{
+		renderParam->degrading = deg;
+		//cout << "CHANGED DEGRADING TO " << deg << endl;
+	};
+
 	////////////////////////////////////////////////////////////////////////
 	// 1. Pull scene data.
 
@@ -167,7 +167,7 @@ HdOSPRayMesh::_PopulateOSPMesh(
 	{
 		VtValue value = sceneDelegate->Get(id, HdTokens->points);
 		_points = value.Get<VtVec3fArray>();
-		//if (_points.size() > 0) _normalsValid = false;
+		if (_points.size() > 0) _normalsValid = false;
 	};
 
 	if (HdChangeTracker::IsDisplayStyleDirty(*dirtyBits, id))
@@ -196,12 +196,12 @@ HdOSPRayMesh::_PopulateOSPMesh(
 	//};
 
 	if (HdChangeTracker::IsPrimvarDirty(*dirtyBits, id, HdTokens->normals)
-		|| HdChangeTracker::IsPrimvarDirty(*dirtyBits, id, HdTokens->widths)
+		//|| HdChangeTracker::IsPrimvarDirty(*dirtyBits, id, HdTokens->widths)
 		|| HdChangeTracker::IsPrimvarDirty(*dirtyBits, id, HdTokens->primvar)
-		|| HdChangeTracker::IsPrimvarDirty(*dirtyBits, id,
-			HdTokens->displayColor)
-		|| HdChangeTracker::IsPrimvarDirty(*dirtyBits, id,
-			HdTokens->displayOpacity)
+		//|| HdChangeTracker::IsPrimvarDirty(*dirtyBits, id,
+		//	HdTokens->displayColor)
+		//|| HdChangeTracker::IsPrimvarDirty(*dirtyBits, id,
+		//	HdTokens->displayOpacity)
 		|| HdChangeTracker::IsPrimvarDirty(*dirtyBits, id,
 			HdOSPRayTokens->st))
 	{
@@ -216,13 +216,13 @@ HdOSPRayMesh::_PopulateOSPMesh(
 	// HdMeshGeomStyleSurf maps to subdivs and everything else maps to
 	// HdMeshGeomStyleHull (coarse triangulated mesh).
 	bool doRefine = (desc.geomStyle == HdMeshGeomStyleSurf);
-
+	// true; // NO WAY 
 	// If the subdivision scheme is "none", force us to not refine.
 	doRefine
 		= doRefine && (_topology.GetScheme() != PxOsdOpenSubdivTokens->none);
 
 	// If the refine level is 0, triangulate instead of subdividing.
-	doRefine = doRefine && (_topology.GetRefineLevel() > 0);
+	// NOOOOOOOOO doRefine = doRefine && (_topology.GetRefineLevel() > 0);
 
 	// The repr defines whether we should compute smooth normals for this mesh:
 	// per-vertex normals taken as an average of adjacent faces, and
@@ -300,7 +300,8 @@ HdOSPRayMesh::_PopulateOSPMesh(
 				= GetPrimvarDescriptors(sceneDelegate, HdInterpolationFaceVarying);
 			for (HdPrimvarDescriptor const& pv : faceVaryingPrimvars)
 			{
-				if (pv.name == "Texture_uv") faceVaryingTexcoord = true;
+				//cout << "PV : " << pv.name.GetString() << endl << flush;
+				if (pv.name == "st") faceVaryingTexcoord = true;
 			};
 
 			if (faceVaryingTexcoord)
@@ -355,23 +356,20 @@ HdOSPRayMesh::_PopulateOSPMesh(
 
 	while (!false &&(newMesh
 		|| HdChangeTracker::IsPrimvarDirty(*dirtyBits, id, HdTokens->points)
-		|| HdChangeTracker::IsPrimvarDirty(*dirtyBits, id,
-			HdOSPRayTokens->st)))
+		|| HdChangeTracker::IsPrimvarDirty(*dirtyBits, id, HdOSPRayTokens->st)))
 	{
 
-		if (_mesh) ospRelease(_mesh);
-
-		_mesh = NULL;
-
-		_mesh = ospNewGeometry("mesh");
-
-		OSPData vertices = ospNewSharedData1D(_points.cdata(), OSP_VEC3F, _points.size());
-		ospCommit(vertices);
-
-		ospSetObject(_mesh, "vertex.position", vertices);
-
 		if (!_refined)
-		{
+		{		
+			if (_mesh) ospRelease(_mesh);
+
+			_mesh = ospNewGeometry("mesh");
+
+			OSPData vertices = ospNewSharedData1D(_points.cdata(), OSP_VEC3F, _points.size());
+			ospCommit(vertices);
+
+			ospSetObject(_mesh, "vertex.position", vertices);
+
 			bool useQuads = _UseQuadIndices(renderIndex, _topology);
 
 			if (useQuads)
@@ -390,7 +388,7 @@ HdOSPRayMesh::_PopulateOSPMesh(
 				ospCommit(indices);
 				ospSetObject(_mesh, "index", indices);
 
-				break;
+				//break;
 
 				// Check if texcoords are provides as face varying.
 				// XXX: (This code currently only cares about _texcoords, but
@@ -453,25 +451,17 @@ HdOSPRayMesh::_PopulateOSPMesh(
 				meshUtil.ComputeTriangleIndices(&_triangulatedIndices,
 					&_trianglePrimitiveParams);
 
-				//auto indices = ospNewData(_triangulatedIndices.size(), OSP_INT3,
-				//                          _triangulatedIndices.cdata(),
-				//                          OSP_DATA_SHARED_BUFFER);
-
 				int sz = _triangulatedIndices.size();
-				cout << "INDCCNT " << sz << endl;
-
-				for (auto ind : _triangulatedIndices) cout << ind << " ";
-				cout << flush << endl;
 
 				OSPData indices = ospNewSharedData1D(_triangulatedIndices.cdata(),
 					OSP_VEC3UI, _triangulatedIndices.size());
 
 				ospCommit(indices);
-				ospRetain(indices);
+				//ospRetain(indices);
 
 				ospSetObject(_mesh, "index", indices);
 
-				break;
+				//break;
 
 
 				// Check if texcoords are provides as face varying.
@@ -555,18 +545,18 @@ HdOSPRayMesh::_PopulateOSPMesh(
 		break;
 	};
 
-	if (!true)
-	{
-		_mesh = ospNewGeometry("sphere");
+	//if (!true)
+	//{
+	//	_mesh = ospNewGeometry("sphere");
 
-		float pos[] = { 0.0,0.5,0.5 };
+	//	float pos[] = { 0.0,0.5,0.5 };
 
-		OSPData poss = ospNewSharedData(pos, OSP_VEC3F, 1);
-		ospCommit(poss);
+	//	OSPData poss = ospNewSharedData(pos, OSP_VEC3F, 1);
+	//	ospCommit(poss);
 
-		ospSetObject(_mesh, "sphere.position", poss);
-		ospSetFloat(_mesh, "radius", 0.5f);
-	};
+	//	ospSetObject(_mesh, "sphere.position", poss);
+	//	ospSetFloat(_mesh, "radius", 0.5f);
+	//};
 
 	ospCommit(_mesh);
 
@@ -582,16 +572,7 @@ HdOSPRayMesh::_PopulateOSPMesh(
 	}
 	else
 	{
-		// Create new ospMaterial
-		ospMaterial = ospNewMaterial("pathtracer","metal");
-
-		//ospMaterial = ospNewMaterial("pathtracer", "glass");
-
-		//ospSetFloat(ospMaterial, "attenuationDistance", 0.25);
-		//ospSetVec3f(ospMaterial, "attenuationColor", 1.0, 0.45, 0.15);
-
-
-		ospCommit(ospMaterial);
+		ospMaterial = renderParam->_material;
 	};
 
 	_model = ospNewGeometricModel(_mesh);
@@ -826,20 +807,22 @@ HdOSPRayMesh::_CreateOSPRaySubdivMesh()
     int numVertices = _points.size();
 
 	OSPData vertices = ospNewSharedData(_points.cdata(),OSP_VEC3F, numVertices);
-    ospSetObjectAsData(mesh, "vertex.position", OSP_VEC3F, vertices);
-    //ospRelease(vertices);
+	ospCommit(vertices);
+    ospSetObject(mesh, "vertex.position", vertices);
 
-	OSPData faces = ospNewSharedData(_topology.GetFaceVertexCounts().cdata(), OSP_UINT, numFaceVertices);
-    ospSetObjectAsData(mesh, "face", OSP_UINT, faces);
-    //ospRelease(faces);
+	OSPData faces = ospNewSharedData(
+		_topology.GetFaceVertexCounts().cdata(), OSP_UINT, numFaceVertices);
+	ospCommit(faces);
+    ospSetObject(mesh, "face", faces);
 
-	OSPData indices = ospNewSharedData(_topology.GetFaceVertexIndices().cdata(), OSP_UINT, numIndices);
-    ospSetObjectAsData(mesh, "index", OSP_UINT, indices);
-    //ospRelease(indices);
+	OSPData indices = ospNewSharedData(
+		_topology.GetFaceVertexIndices().cdata(), OSP_UINT, numIndices);
+	ospCommit(indices);
+    ospSetObject(mesh, "index", indices);
 
     // TODO: set hole buffer - AGREE
 
-    OSPData colorsData = nullptr;
+    //OSPData colorsData = nullptr;
     // there is a bug in ospray subd requiring a color array of size points.
     // if the color array is less than points size we create an array
     // of white colors as a workaround.

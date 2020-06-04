@@ -32,6 +32,10 @@ using namespace std;
 #include <pxr/imaging/hd/camera.h>
 #include <pxr/imaging/hd/bprim.h>
 
+// OIIO
+#include <OpenImageIO/imageio.h>
+OIIO_NAMESPACE_USING;
+
 // OSPRAY
 #include <ospray/ospray.h>
 
@@ -43,7 +47,8 @@ using namespace std;
 #include "renderPass.h"
 
 #include "material.h"
-#include "mesh.h"
+//#include "mesh.h"
+#include "subd.h"
 
 #include "renderDelegate.h"
 
@@ -108,7 +113,8 @@ HdRprim* HdOSPRayRenderDelegate::CreateRprim(TfToken const& typeId,
 {
 	if (typeId == HdPrimTypeTokens->mesh)
 	{
-		return new HdOSPRayMesh(rprimId, instancerId);
+		return new HdOSPRaySubd(rprimId, instancerId);
+		//return new HdOSPRayMesh(rprimId, instancerId);
 	}
 	else
 	{
@@ -283,6 +289,22 @@ HdOSPRayRenderDelegate::_Initialize()
 	ospLoadModule("denoiser");
 
     _renderParam = std::make_shared<HdOSPRayRenderParam>(&_sceneVersion);
+
+	_renderParam->_material = ospNewMaterial("pathtracer", "principled");
+
+	const char* file = "F:\\Clouds\\YandexDisk\\Projects\\OSPRayHd\\tests\\img.jpg";
+	OSPTexture texture = HdOSPRayMaterial::LoadOIIOTexture2D(file);
+	
+	//ospSetVec3f(_renderParam->_material, "ks", 1.0f,1.0f,1.0f);
+	//ospSetFloat(_renderParam->_material, "ns", 200);
+
+
+	ospSetObject(_renderParam->_material, "map_baseColor", texture);
+
+
+	//ospSetFloat(_renderParam->_material, "attenuationDistance", 0.25);
+	//ospSetVec3f(_renderParam->_material, "attenuationColor", 1.0, 0.45, 0.15);
+	ospCommit(_renderParam->_material);
 
     // Initialize one resource registry for all OSPRay plugins
     std::lock_guard<std::mutex> guard(_mutexResourceRegistry);

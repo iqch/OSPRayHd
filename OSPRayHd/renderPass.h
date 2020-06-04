@@ -106,7 +106,12 @@ private:
 
 	OSPLight _sunlight;
 
+	// TESTCASE
 	OSPData _positions;
+	OSPData _indices;
+	OSPData _faces;
+	OSPData _texcoord;
+
 	OSPGeometry _geometry;
 	OSPGeometricModel _model;
 	OSPMaterial _material;
