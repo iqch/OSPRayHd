@@ -49,6 +49,8 @@ protected:
 
 	vector<OSPGeometry> _mesh;
 	vector<OSPGeometricModel> _model;
+	//OSPGeometry _mesh { NULL };
+	//OSPGeometricModel _model { NULL };
 	OSPGroup _group { NULL };
 	OSPInstance  _instance { NULL };
 
@@ -56,9 +58,14 @@ protected:
 	// only call const accessors keeping them around doesn't incur a buffer
 	// copy.
 	int _refineLevel;
-	HdMeshTopology _topology;
+
+	//HdMeshTopology _topology;
+	PxOsdMeshTopology _topology;
+
 	GfMatrix4f _transform;
 	VtVec3fArray _points;
+	VtIntArray _indices;
+	VtIntArray _faces;
 	VtVec2fArray _texcoords;
 	VtVec3fArray _normals;
 	VtVec4fArray _colors;
@@ -69,8 +76,8 @@ protected:
 	VtVec3fArray _computedNormals;
 
 	Hd_VertexAdjacency _adjacency;
-	bool _adjacencyValid;
-	bool _normalsValid;
+	//bool _adjacencyValid;
+	//bool _normalsValid;
 
 	// Draw styles.
 	int _tessellationRate{ 32 };

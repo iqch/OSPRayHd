@@ -219,7 +219,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>F:\App\Python36\libs;F:\App\ospray2\lib;F:\SDK\USD\lib;F:\SDK\oidn\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>hd.lib;opengl32.lib;glew32.lib;hdx.lib;trace.lib;hdst.lib;hf.lib;arch.lib;gf.lib;pxOsd.lib;tf.lib;sdf.lib;ptex.lib;OpenImageIO.lib;vt.lib;ospcommon_static.lib;ospray.lib;OpenImageDenoise.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>hd.lib;opengl32.lib;glew32.lib;hdx.lib;trace.lib;hdst.lib;hf.lib;arch.lib;gf.lib;pxOsd.lib;tf.lib;sdf.lib;ptex.lib;OpenImageIO.lib;vt.lib;ospcommon_static.lib;ospray.lib;OpenImageDenoise.lib;osdCPU.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <OutputFile>F:/App/ospray2/bin/hdOSPRay.dll</OutputFile>
     </Link>
   </ItemDefinitionGroup>

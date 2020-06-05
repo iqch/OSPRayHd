@@ -292,14 +292,13 @@ HdOSPRayRenderDelegate::_Initialize()
 
 	_renderParam->_material = ospNewMaterial("pathtracer", "principled");
 
-	const char* file = "F:\\Clouds\\YandexDisk\\Projects\\OSPRayHd\\tests\\img.jpg";
-	OSPTexture texture = HdOSPRayMaterial::LoadOIIOTexture2D(file);
+	const char* file = "F:\\Clouds\\YandexDisk\\Projects\\OSPRayHd\\tests\\test2.jpg";
+	OSPTexture texture = HdOSPRayMaterial::LoadOIIOTexture2D(file,true);
 	
-	//ospSetVec3f(_renderParam->_material, "ks", 1.0f,1.0f,1.0f);
-	//ospSetFloat(_renderParam->_material, "ns", 200);
+	ospSetVec3f(_renderParam->_material, "ks", 1.0f,1.0f,1.0f);
+	ospSetFloat(_renderParam->_material, "ns", 200);
 
-
-	ospSetObject(_renderParam->_material, "map_baseColor", texture);
+	//ospSetObject(_renderParam->_material, "map_baseColor", texture);
 
 
 	//ospSetFloat(_renderParam->_material, "attenuationDistance", 0.25);
